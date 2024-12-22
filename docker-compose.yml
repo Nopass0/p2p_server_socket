@@ -34,7 +34,8 @@ services:
     volumes:
       - .:/app
       - /app/node_modules
-    command: sh -c "apt-get update && apt-get install -y netcat-openbsd && /wait-for-it.sh postgres:5432 -- bunx prisma db push && bun run src/app.ts"
+      - /app/node_modules/.prisma
+    command: sh -c "/wait-for-it.sh postgres:5432 -- sh -c 'bunx prisma generate && bunx prisma db push && bun run src/app.ts'"
 
 volumes:
   postgres_data:

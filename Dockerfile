@@ -14,11 +14,14 @@ COPY package.json bun.lockb ./
 # Install dependencies
 RUN bun install
 
-# Copy the rest of the application
-COPY . .
+# Copy prisma schema
+COPY prisma ./prisma/
 
 # Generate Prisma client
 RUN bunx prisma generate
+
+# Copy the rest of the application
+COPY . .
 
 # Expose the port
 EXPOSE 3000
@@ -27,4 +30,4 @@ EXPOSE 3000
 COPY ./wait-for-it.sh /wait-for-it.sh
 RUN chmod +x /wait-for-it.sh
 
-CMD ["/wait-for-it.sh", "postgres:5432", "--", "bun", "run", "src/app.ts"]
+CMD ["/wait-for-it.sh", "postgres:5432", "--", "sh", "-c", "bunx prisma generate && bunx prisma db push && bun run src/app.ts"]
