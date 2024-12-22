@@ -19,6 +19,8 @@ COPY prisma ./prisma/
 COPY . .
 
 # Generate Prisma client
+RUN bunx prisma init
+RUN bunx prisma db push
 RUN bunx prisma generate
 
 # Make scripts executable
