@@ -17,11 +17,11 @@ RUN bun install
 # Generate Prisma client
 RUN bunx prisma generate
 
-# Make wait script executable
-RUN chmod +x /app/wait-for-it.sh
+# Make scripts executable
+RUN chmod +x /app/wait-for-it.sh && chmod +x /app/start-app.sh
 
 # Expose port
 EXPOSE 3000
 
 # Start command
-CMD ["/app/wait-for-it.sh", "postgres:5432", "--", "sh", "-c", "cd /app && bunx prisma generate && bunx prisma db push && bun run src/app.ts"]
+CMD ["bash", "/app/wait-for-it.sh"]
