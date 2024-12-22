@@ -1,23 +1,7 @@
 #!/bin/bash
-# wait-for-it.sh
-set -x
+
 TIMEOUT=60
 QUIET=0
-
-echoerr() {
-    if [ "$QUIET" -ne 1 ]; then printf "%s\n" "$*" 1>&2; fi
-}
-
-usage() {
-    exitcode="$1"
-    cat << USAGE >&2
-Usage:
-    $cmdname host:port [-t timeout] [-- command args]
-    -t TIMEOUT                  Timeout in seconds, zero for no timeout
-    -- COMMAND ARGS             Execute command with args after the test finishes
-USAGE
-    exit "$exitcode"
-}
 
 wait_for() {
     for i in `seq $TIMEOUT` ; do
@@ -44,18 +28,6 @@ do
         PORT=$(printf "%s\n" "$1"| cut -d : -f 2)
         shift 1
         ;;
-        -t)
-        TIMEOUT="$2"
-        if [ "$TIMEOUT" = "" ]; then break; fi
-        shift 2
-        ;;
-        --)
-        shift
-        break
-        ;;
-        --help)
-        usage 0
-        ;;
         *)
         echoerr "Unknown argument: $1"
         usage 1
@@ -63,9 +35,4 @@ do
     esac
 done
 
-if [ "$HOST" = "" -o "$PORT" = "" ]; then
-    echoerr "Error: you need to provide a host and port to test."
-    usage 2
-fi
-
-wait_for "$@"
+wait_for cd /app && ./start-app.sh

@@ -8,26 +8,20 @@ RUN apt-get update && \
     dnsutils \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy package files first for better caching
-COPY package.json bun.lockb ./
+# Copy all files
+COPY . .
 
 # Install dependencies
 RUN bun install
 
-# Copy prisma schema
-COPY prisma ./prisma/
-
 # Generate Prisma client
 RUN bunx prisma generate
 
-# Copy the rest of the application
-COPY . .
+# Make wait script executable
+RUN chmod +x /app/wait-for-it.sh
 
-# Expose the port
+# Expose port
 EXPOSE 3000
 
-# Create a script to wait for DB and start the app
-COPY ./wait-for-it.sh /wait-for-it.sh
-RUN chmod +x /wait-for-it.sh
-
-CMD ["/wait-for-it.sh", "postgres:5432", "--", "sh", "-c", "bunx prisma generate && bunx prisma db push && bun run src/app.ts"]
+# Start command
+CMD ["/app/wait-for-it.sh", "postgres:5432", "--", "sh", "-c", "cd /app && bunx prisma generate && bunx prisma db push && bun run src/app.ts"]
