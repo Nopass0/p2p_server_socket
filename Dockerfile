@@ -1,19 +1,24 @@
 FROM oven/bun:1.0
+
 WORKDIR /app
 
-# Копируем все файлы проекта
-COPY . .
+# Copy package files first for better caching
+COPY package.json bun.lockb ./
 
-# Устанавливаем зависимости
+# Install dependencies
 RUN bun install
 
-# Генерируем Prisma клиент
-RUN bunx prisma init
-RUN bunx prisma db pull
+# Copy the rest of the application
+COPY . .
+
+# Generate Prisma client
 RUN bunx prisma generate
 
-# Expose the port your app runs on
+# Expose the port
 EXPOSE 3000
 
-# Start the application
-CMD ["bun", "run", "src/app.ts"]
+# Create a script to wait for DB and start the app
+COPY ./wait-for-it.sh /wait-for-it.sh
+RUN chmod +x /wait-for-it.sh
+
+CMD ["/wait-for-it.sh", "postgres:5432", "--", "bun", "run", "src/app.ts"]

@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: root
+      POSTGRES_DB: p2pp
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: .
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: "postgresql://postgres:root@postgres:5432/p2pp"
+      DIRECT_URL: "postgresql://postgres:root@postgres:5432/p2pp"
+      TELEGRAM_BOT_TOKEN: "7750406996:AAHCSxdVVHMOD0QIShGb10gd02_844ngr0o"
+      NEXT_PUBLIC_TELEGRAM_BOT_USERNAME: "p2p_testbotbot"
+      NODE_ENV: "development"
+      GEMINI_TEST_TOKEN: "AIzaSyC91INRsX6FRSOAvC0i-noyiOsHD3tC7ZM"
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+      - /app/node_modules
+    command: sh -c "/wait-for-it.sh postgres:5432 -- bunx prisma db push && bun run src/app.ts"
+
+volumes:
+  postgres_data:
