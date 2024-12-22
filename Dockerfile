@@ -1,8 +1,12 @@
 FROM oven/bun:1.0
 WORKDIR /app
 
-# Install netcat
-RUN apt-get update && apt-get install -y netcat-openbsd
+# Install required tools
+RUN apt-get update && \
+    apt-get install -y \
+    netcat-openbsd \
+    dnsutils \
+    && rm -rf /var/lib/apt/lists/*
 
 # Copy package files first for better caching
 COPY package.json bun.lockb ./
