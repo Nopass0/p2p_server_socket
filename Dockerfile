@@ -1,20 +1,22 @@
-# Dockerfile
 FROM oven/bun:1.0
+
+# Устанавливаем git
+RUN apt-get update && apt-get install -y git
 
 WORKDIR /app
 
-# Copy package files
-COPY package.json bun.lockb ./
+# Клонируем или обновляем репозиторий
+# Предполагается, что репозиторий публичный. Если приватный, нужно добавить креды
+COPY . .
+RUN git pull
 
 # Install dependencies
+COPY package.json bun.lockb ./
 RUN bun install
 
-# Copy prisma schema and generate client
+# Generate Prisma client
 COPY prisma ./prisma/
 RUN bunx prisma generate
-
-# Copy source code
-COPY . .
 
 # Expose the port your app runs on
 EXPOSE 3000
