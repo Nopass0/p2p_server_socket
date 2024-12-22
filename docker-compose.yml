@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 
 services:
   postgres:
@@ -34,7 +34,7 @@ services:
     volumes:
       - .:/app
       - /app/node_modules
-    command: sh -c "/wait-for-it.sh postgres:5432 -- bunx prisma db push && bun run src/app.ts"
+    command: sh -c "apt-get update && apt-get install -y netcat-openbsd && /wait-for-it.sh postgres:5432 -- bunx prisma db push && bun run src/app.ts"
 
 volumes:
   postgres_data:

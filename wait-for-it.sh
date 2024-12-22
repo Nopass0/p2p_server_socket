@@ -1,7 +1,7 @@
 #!/bin/bash
 # wait-for-it.sh
 
-TIMEOUT=15
+TIMEOUT=30
 QUIET=0
 
 echoerr() {
