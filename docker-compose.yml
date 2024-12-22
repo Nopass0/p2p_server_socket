@@ -36,6 +36,7 @@ services:
       - /app/node_modules
       - /app/prisma
       - /app/.prisma
+      - prisma_generated:/app/node_modules/.prisma
 
 volumes:
   postgres_data:

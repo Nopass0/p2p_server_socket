@@ -8,19 +8,22 @@ RUN apt-get update && \
     dnsutils \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy all files
-COPY . .
-
-# Install dependencies
+# Copy package files
+COPY package.json bun.lockb ./
 RUN bun install
+
+# Copy prisma schema
+COPY prisma ./prisma/
+
+# Copy all other files
+COPY . .
 
 # Generate Prisma client
 RUN bunx prisma generate
 
 # Make scripts executable
-RUN chmod +x /app/wait-for-it.sh && chmod +x /app/start-app.sh
+RUN chmod +x /app/wait-for-it.sh /app/start-app.sh
 
-# Expose port
 EXPOSE 3000
 
 # Start command
