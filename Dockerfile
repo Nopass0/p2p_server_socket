@@ -8,8 +8,9 @@ COPY . .
 RUN bun install
 
 # Генерируем Prisma клиент
-RUN bunx prisma generate
+RUN bunx prisma init
 RUN bunx prisma db pull
+RUN bunx prisma generate
 
 # Expose the port your app runs on
 EXPOSE 3000
