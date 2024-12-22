@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "bun run --watch src/app.ts",
     "build": "bun run build",
-    "start": "bun run src/app.ts"
+    "start": "bun run src/app.ts",
+    "postinstall": "bunx prisma generate"
   },
   "devDependencies": {
     "@types/bun": "latest"
