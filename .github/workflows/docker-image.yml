@@ -25,7 +25,11 @@ jobs:
 
       - name: Deploy to server
         run: |
-          ssh -p ${{ secrets.SERVER_PORT }} ${{ secrets.SERVER_USERNAME }}@${{ secrets.SERVER_HOST }} << 'E>
-            cd /socket_p2p
+          ssh -p ${{ secrets.SERVER_PORT }} ${{ secrets.SERVER_USERNAME }}@${{ secrets.SERVER_HOST }} << 'ENDSSH'
+            cd ${{ secrets.PROJECT_PATH }}
             git pull
-            ./start.sh
+            docker-compose down
+            docker system prune -af --volumes
+            docker-compose build --no-cache
+            docker-compose up -d
+          ENDSSH
