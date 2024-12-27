@@ -162,11 +162,16 @@ export class GateMonitoringService extends BaseService {
     gateCookie: GateCookie,
   ): Promise<GatePayment[]> {
     try {
+      const cookiesArray = JSON.parse(gateCookie.cookie);
+      const cookieString = cookiesArray
+        .map((cookie) => `${cookie.name}=${cookie.value}`)
+        .join("; ");
+
       const response = await axios.get(this.GATE_API_URL, {
         headers: {
           Accept: "application/json",
           "Content-Type": "application/json",
-          Cookie: gateCookie.cookie,
+          Cookie: cookieString,
           "User-Agent": this.GATE_USER_AGENT,
         },
       });
