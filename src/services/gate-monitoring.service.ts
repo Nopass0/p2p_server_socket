@@ -91,11 +91,19 @@ export class GateMonitoringService extends BaseService {
 
   private async validateCookie(gateCookie: GateCookie): Promise<boolean> {
     try {
+      // Parse the stored JSON cookie array
+      const cookiesArray = JSON.parse(gateCookie.cookie);
+
+      // Convert the cookie array to a cookie string
+      const cookieString = cookiesArray
+        .map((cookie) => `${cookie.name}=${cookie.value}`)
+        .join("; ");
+
       const response = await axios.get(this.GATE_API_URL, {
         headers: {
           Accept: "application/json",
           "Content-Type": "application/json",
-          Cookie: gateCookie.cookie,
+          Cookie: cookieString,
           "User-Agent": this.GATE_USER_AGENT,
         },
       });
@@ -104,9 +112,9 @@ export class GateMonitoringService extends BaseService {
         response.status === 200 &&
         Array.isArray(response.data?.response?.payouts?.data);
 
-      // Обновляем статус куки
+      // Update cookie status
       await db.gateCookie.update({
-        where: { id: gateCookie.id }, // Обновляем по id
+        where: { id: gateCookie.id },
         data: {
           isActive: isValid,
           lastChecked: new Date(),
