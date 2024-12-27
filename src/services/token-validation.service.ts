@@ -44,27 +44,35 @@ export class TokenValidationService extends BaseService {
         },
         body: `token=${encodeURIComponent(token)}`,
       });
-
+      console.log(token);
       const orders = await response.json();
 
       for (const order of orders) {
         const existingOrder = await db.p2PTransaction.findFirst({
           where: {
             userId,
-            telegramId: String(order.order_id), // Конвертируем в строку
+            telegramId: String(order.order_id), // Convert to string
           },
         });
 
         if (!existingOrder) {
+          // Helper function to parse amounts
+          const parseAmount = (value: any): number => {
+            if (typeof value === "string") {
+              return parseFloat(value.replace(/,/g, "."));
+            }
+            return typeof value === "number" ? value : 0;
+          };
+
           await db.p2PTransaction.create({
             data: {
               userId,
-              telegramId: String(order.order_id), // Конвертируем в строку
+              telegramId: String(order.order_id), // Convert to string
               status: order.status,
-              amount: order.amount.value,
-              totalRub: 0,
+              amount: parseAmount(order.volume?.value ?? 0),
+              totalRub: parseAmount(order.amount?.value ?? 0),
               price: 0,
-              buyerName: String(order.buyer_id), // Конвертируем в строку для безопасности
+              buyerName: String(order.buyer_id), // Convert to string for safety
               method: order.payment_method || "unknown",
               completedAt: new Date(order.status_update_time),
               processed: false,

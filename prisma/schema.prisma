@@ -5,7 +5,6 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
-
 }
 
 model AdminAction {
@@ -80,13 +79,18 @@ model GateTransaction {
   course          Float?
   successCount    Int?
   successRate     Float?
-  usdtBalance     String?
-  rubBalance      String?
   approvedAt      DateTime?
   expiredAt       DateTime?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime
+  attachments     Json?
+  bankCode        String?
+  traderId        Int?
+  traderName      String?
   User            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  TransactionMatch TransactionMatch[]
+  receipts Receipt[]
 
   @@index([transactionId])
   @@index([userId, createdAt])
@@ -194,6 +198,7 @@ model User {
   TronWallet          TronWallet?
   UserActivityLog     UserActivityLog[]
   UserSession         UserSession[]
+  TransactionMatch TransactionMatch[]
 
   @@index([telegramId])
 }
@@ -256,8 +261,8 @@ model P2PTransaction {
   userId      Int
   telegramId  String
   status      String
-  amount      Float
-  totalRub    Float
+  amount      Float // USDT
+  totalRub    Float // RUB
   price       Float
   buyerName   String
   method      String
@@ -267,7 +272,45 @@ model P2PTransaction {
   processed   Boolean  @default(false)
   User        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  TransactionMatch TransactionMatch[]
+
   @@unique([userId, telegramId])
   @@index([telegramId])
   @@index([userId])
+}
+
+model TransactionMatch {
+  id              Int             @id @default(autoincrement())
+  userId          Int
+  p2pTxId         Int
+  gateTxId        Int
+  isAutoMatched   Boolean         @default(false)
+  timeDifference  Int             // Time difference in minutes
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  User            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  P2PTransaction  P2PTransaction  @relation(fields: [p2pTxId], references: [id], onDelete: Cascade)
+  GateTransaction GateTransaction @relation(fields: [gateTxId], references: [id], onDelete: Cascade)
+
+  @@unique([p2pTxId, gateTxId])
+  @@index([userId, createdAt])
+  @@index([p2pTxId])
+  @@index([gateTxId])
+}
+
+
+model Receipt {
+  id            Int      @id @default(autoincrement())
+  gateId        Int
+  bankLabel     String?
+  fileName      String
+  fileSize      Int
+  filePath      String
+  isVerified    Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  GateTransaction GateTransaction @relation(fields: [gateId], references: [id], onDelete: Cascade)
+
+  @@index([gateId])
+  @@index([isVerified])
 }

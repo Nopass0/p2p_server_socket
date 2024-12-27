@@ -30,20 +30,52 @@ interface GatePayment {
     courses: {
       trader: number;
     };
+    reason: {
+      trader: null | string;
+      support: null | string;
+    };
   };
   method: {
+    id: number;
+    type: number;
+    name: number;
     label: string;
+    status: number;
+    payment_provider_id: number;
+    wallet_currency_id: number;
   };
-  bank: {
+  attachments: {
     name: string;
-    label: string;
-  };
+    file_name: string;
+    original_url: string;
+    extension: string;
+    size: number;
+    created_at: string;
+    custom_properties: {
+      fake: boolean;
+    };
+  }[];
   tooltip: {
     payments: {
       success: number;
       rejected: number | null;
       percent: number;
     };
+    reasons: any[];
+  };
+  bank: {
+    id: number;
+    name: string;
+    code: string | number;
+    label: string;
+    meta: {
+      system: string;
+      country: string;
+    };
+  };
+  trader: {
+    id: number;
+    name: string;
   };
 }
 
@@ -148,7 +180,7 @@ export class GateMonitoringService extends BaseService {
     let processedCount = 0;
     for (const transaction of transactions) {
       try {
-        // Проверяем существование транзакции
+        // Check if the transaction already exists
         const existingTransaction = await db.gateTransaction.findFirst({
           where: {
             userId,
@@ -157,7 +189,7 @@ export class GateMonitoringService extends BaseService {
         });
 
         if (!existingTransaction) {
-          // Создаем новую транзакцию
+          // Create a new transaction with all fields
           await db.gateTransaction.create({
             data: {
               userId,
@@ -170,6 +202,7 @@ export class GateMonitoringService extends BaseService {
               totalUsdt: transaction.total.trader["000001"] || 0,
               status: transaction.status,
               bankName: transaction.bank?.name || null,
+              bankCode: transaction.bank?.code?.toString() || null,
               bankLabel: transaction.bank?.label || null,
               paymentMethod: transaction.method?.label || null,
               course: transaction.meta?.courses?.trader || null,
@@ -183,6 +216,9 @@ export class GateMonitoringService extends BaseService {
                 : null,
               createdAt: new Date(transaction.created_at),
               updatedAt: new Date(transaction.updated_at),
+              traderId: transaction.trader?.id || null,
+              traderName: transaction.trader?.name || null,
+              attachments: transaction.attachments || null, // Store attachments as JSON
             },
           });
           console.log(

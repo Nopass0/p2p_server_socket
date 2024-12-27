@@ -19,6 +19,7 @@ export interface ServiceStats {
   errors: number;
   lastRunTime: Date;
   isRunning: boolean;
+  processedReceipts?: number;
 }
 
 export interface TokenValidationResult {
