@@ -26,10 +26,10 @@ const corsHeaders = {
 };
 
 // Start background services
-await tokenService.start().catch(console.error);
-await matchingService.start().catch(console.error);
-await gateService.start().catch(console.error);
-await receiptProcessor.start().catch(console.error);
+tokenService.start().catch(console.error);
+matchingService.start().catch(console.error);
+gateService.start().catch(console.error);
+receiptProcessor.start().catch(console.error);
 
 const server = Bun.serve({
   async fetch(req) {
