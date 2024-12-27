@@ -188,6 +188,8 @@ export class GateMonitoringService extends BaseService {
           },
         });
 
+        console.log("🔍 Поиск транзакции", transaction.id);
+
         if (!existingTransaction) {
           // Create a new transaction with all fields
           await db.gateTransaction.create({
