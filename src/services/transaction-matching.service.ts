@@ -144,7 +144,7 @@ export class TransactionMatchingService extends BaseService {
           select: {
             id: true,
             username: true,
-            telegramId: true,
+            login: true
           },
         });
 
@@ -156,7 +156,7 @@ export class TransactionMatchingService extends BaseService {
         for (const user of users) {
           try {
             console.log(
-              `\n📝 Processing user ${user.id} (${user.username || user.telegramId})`,
+              `\n📝 Processing user ${user.id} (${user.login})`,
             );
             const matches = await this.processUserTransactions(user.id);
             processedUsers++;

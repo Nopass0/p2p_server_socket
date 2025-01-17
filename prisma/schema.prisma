@@ -57,40 +57,41 @@ model GateCookie {
   lastChecked DateTime @default(now())
   createdAt   DateTime @default(now())
   updatedAt   DateTime
-  User        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  User        User     @relation(fields: [userId], references: [id])
 
-  @@index([userId])
+  @@unique([userId, cookie])
 }
 
 model GateTransaction {
-  id              Int       @id @default(autoincrement())
-  userId          Int
-  transactionId   String    @unique
-  paymentMethodId Int
-  wallet          String
-  amountRub       Float
-  amountUsdt      Float
-  totalRub        Float
-  totalUsdt       Float
-  status          Int
-  bankName        String?
-  bankLabel       String?
-  paymentMethod   String?
-  course          Float?
-  successCount    Int?
-  successRate     Float?
-  approvedAt      DateTime?
-  expiredAt       DateTime?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime
-  attachments     Json?
-  bankCode        String?
-  traderId        Int?
-  traderName      String?
-  User            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-
+  id               Int                @id @default(autoincrement())
+  userId           Int
+  transactionId    String             @unique
+  paymentMethodId  Int
+  wallet           String
+  amountRub        Float
+  amountUsdt       Float
+  totalRub         Float
+  totalUsdt        Float
+  status           Int
+  bankName         String?
+  bankLabel        String?
+  paymentMethod    String?
+  course           Float?
+  successCount     Int?
+  successRate      Float?
+  approvedAt       DateTime?
+  expiredAt        DateTime?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime
+  attachments      Json?
+  bankCode         String?
+  traderId         Int?
+  traderName       String?
+  commissionRate   Float?
+  initialBalance   Float?
+  User             User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  receipts         Receipt[]
   TransactionMatch TransactionMatch[]
-  receipts Receipt[]
 
   @@index([transactionId])
   @@index([userId, createdAt])
@@ -176,9 +177,11 @@ model TronWallet {
 
 model User {
   id                  Int                   @id @default(autoincrement())
-  telegramId          String                @unique
+  telegramId          String?               @unique
+  login               String                @unique
+  password            String
   username            String?
-  firstName           String
+  firstName           String?
   lastName            String?
   photoUrl            String?
   isAdmin             Boolean               @default(false)
@@ -186,6 +189,7 @@ model User {
   updatedAt           DateTime
   tgAuthToken         String?
   geminiToken         String?
+  commissionRate      Float?
   AdminAction         AdminAction[]
   DeviceToken         DeviceToken[]
   GateCookie          GateCookie[]
@@ -194,13 +198,14 @@ model User {
   Screenshot          Screenshot[]
   Session             Session[]
   TelegramTransaction TelegramTransaction[]
+  TransactionMatch    TransactionMatch[]
   TronTransaction     TronTransaction[]
   TronWallet          TronWallet?
   UserActivityLog     UserActivityLog[]
   UserSession         UserSession[]
-  TransactionMatch TransactionMatch[]
 
   @@index([telegramId])
+  @@index([login])
 }
 
 model Screenshot {
@@ -257,21 +262,20 @@ model UserSession {
 }
 
 model P2PTransaction {
-  id          Int      @id @default(autoincrement())
-  userId      Int
-  telegramId  String
-  status      String
-  amount      Float // USDT
-  totalRub    Float // RUB
-  price       Float
-  buyerName   String
-  method      String
-  tradeStats  String?
-  completedAt DateTime
-  createdAt   DateTime @default(now())
-  processed   Boolean  @default(false)
-  User        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
+  id               Int                @id @default(autoincrement())
+  userId           Int
+  telegramId       String
+  status           String
+  amount           Float
+  totalRub         Float
+  price            Float
+  buyerName        String
+  method           String
+  tradeStats       String?
+  completedAt      DateTime
+  createdAt        DateTime           @default(now())
+  processed        Boolean            @default(false)
+  User             User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   TransactionMatch TransactionMatch[]
 
   @@unique([userId, telegramId])
@@ -285,12 +289,12 @@ model TransactionMatch {
   p2pTxId         Int
   gateTxId        Int
   isAutoMatched   Boolean         @default(false)
-  timeDifference  Int             // Time difference in minutes
+  timeDifference  Int
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
-  User            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  P2PTransaction  P2PTransaction  @relation(fields: [p2pTxId], references: [id], onDelete: Cascade)
   GateTransaction GateTransaction @relation(fields: [gateTxId], references: [id], onDelete: Cascade)
+  P2PTransaction  P2PTransaction  @relation(fields: [p2pTxId], references: [id], onDelete: Cascade)
+  User            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([p2pTxId, gateTxId])
   @@index([userId, createdAt])
@@ -298,19 +302,34 @@ model TransactionMatch {
   @@index([gateTxId])
 }
 
-
 model Receipt {
-  id            Int      @id @default(autoincrement())
-  gateId        Int
-  bankLabel     String?
-  fileName      String
-  fileSize      Int
-  filePath      String
-  isVerified    Boolean  @default(false)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id              Int             @id @default(autoincrement())
+  gateId          Int
+  bankLabel       String?
+  fileName        String
+  fileSize        Int
+  filePath        String
+  isVerified      Boolean         @default(false)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
   GateTransaction GateTransaction @relation(fields: [gateId], references: [id], onDelete: Cascade)
 
   @@index([gateId])
   @@index([isVerified])
+}
+
+model CustomMetric {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  formula     String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime
+}
+
+model Expense {
+  id     Int      @id @default(autoincrement())
+  amount Float
+  date   DateTime
+  name   String
 }
