@@ -183,15 +183,23 @@ model User {
   username            String?
   firstName           String?
   lastName            String?
+  middleName          String?
   photoUrl            String?
+  passportPhoto       String?
+  deposit             Float                 @default(0)
+  commissionRate      Float?
+  salaryPercentage    Float                 @default(0.5)
+  initialBalance      Float?
   isAdmin             Boolean               @default(false)
   createdAt           DateTime              @default(now())
   updatedAt           DateTime
   tgAuthToken         String?
   geminiToken         String?
-  commissionRate      Float?
   AdminAction         AdminAction[]
+  Appeal              Appeal[]
   DeviceToken         DeviceToken[]
+  EmployeeComment     EmployeeComment[]
+  EmployeeExpense     EmployeeExpense[]
   GateCookie          GateCookie[]
   GateTransaction     GateTransaction[]
   P2PTransaction      P2PTransaction[]
@@ -203,6 +211,7 @@ model User {
   TronWallet          TronWallet?
   UserActivityLog     UserActivityLog[]
   UserSession         UserSession[]
+  WorkTime            WorkTime[]
 
   @@index([telegramId])
   @@index([login])
@@ -332,4 +341,78 @@ model Expense {
   amount Float
   date   DateTime
   name   String
+}
+
+model Appeal {
+  id              Int      @id @default(autoincrement())
+  userId          Int
+  gateId          String
+  status          String
+  employeeComment String?
+  adminComment    String?
+  isFinalized     Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime
+  User            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([gateId])
+  @@index([userId])
+}
+
+model EmployeeComment {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime
+  User      User     @relation(fields: [userId], references: [id])
+}
+
+model EmployeeExpense {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  amount      Float
+  currency    String
+  type        String
+  date        DateTime
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime
+  User        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model WorkReport {
+  id             Int              @id @default(autoincrement())
+  workTimeId     Int              @unique
+  content        String
+  createdAt      DateTime         @default(now())
+  WorkTime       WorkTime         @relation(fields: [workTimeId], references: [id])
+  WorkReportFile WorkReportFile[]
+}
+
+model WorkReportFile {
+  id         Int        @id @default(autoincrement())
+  reportId   Int
+  filename   String
+  path       String
+  createdAt  DateTime   @default(now())
+  WorkReport WorkReport @relation(fields: [reportId], references: [id])
+
+  @@index([reportId])
+}
+
+model WorkTime {
+  id         Int         @id @default(autoincrement())
+  userId     Int
+  duration   Float
+  startTime  DateTime
+  endTime    DateTime?
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime
+  WorkReport WorkReport?
+  User       User        @relation(fields: [userId], references: [id])
+
+  @@index([userId])
 }
