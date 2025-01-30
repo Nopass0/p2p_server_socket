@@ -183,18 +183,18 @@ model User {
   username            String?
   firstName           String?
   lastName            String?
-  middleName          String?
   photoUrl            String?
-  passportPhoto       String?
-  deposit             Float                 @default(0)
-  commissionRate      Float?
-  salaryPercentage    Float                 @default(0.5)
-  initialBalance      Float?
   isAdmin             Boolean               @default(false)
   createdAt           DateTime              @default(now())
   updatedAt           DateTime
   tgAuthToken         String?
   geminiToken         String?
+  commissionRate      Float?
+  initialBalance      Float?
+  middleName          String?
+  passportPhoto       String?
+  deposit             Float                 @default(0)
+  salaryPercentage    Float                 @default(0.5)
   AdminAction         AdminAction[]
   Appeal              Appeal[]
   DeviceToken         DeviceToken[]
@@ -406,9 +406,9 @@ model WorkReportFile {
 model WorkTime {
   id         Int         @id @default(autoincrement())
   userId     Int
-  duration   Float
   startTime  DateTime
   endTime    DateTime?
+  duration   Float
   createdAt  DateTime    @default(now())
   updatedAt  DateTime
   WorkReport WorkReport?

@@ -81,7 +81,7 @@ interface GatePayment {
 
 export class GateMonitoringService extends BaseService {
   private readonly GATE_API_URL =
-    "https://panel.gate.cx/api/v1/payments/payouts?filters%5Bstatus%5D%5B%5D=2&filters%5Bstatus%5D%5B%5D=3&filters%5Bstatus%5D%5B%5D=7&filters%5Bstatus%5D%5B%5D=8&filters%5Bstatus%5D%5B%5D=9&page=1";
+    "https://panel.gate.cx/api/v1/payments/payouts?filters%5Bstatus%5D%5B%5D=2&filters%5Bstatus%5D%5B%5D=3&filters%5Bstatus%5D%5B%5D=7&filters%5Bstatus%5D%5B%5D=8&filters%5Bstatus%5D%5B%5D=9&page=";
   private readonly GATE_USER_AGENT =
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36";
 
@@ -99,7 +99,7 @@ export class GateMonitoringService extends BaseService {
         .map((cookie) => `${cookie.name}=${cookie.value}`)
         .join("; ");
 
-      const response = await axios.get(this.GATE_API_URL, {
+      const response = await axios.get(this.GATE_API_URL + 1, {
         headers: {
           Accept: "application/json",
           "Content-Type": "application/json",
@@ -160,6 +160,7 @@ export class GateMonitoringService extends BaseService {
 
   private async fetchGateTransactions(
     gateCookie: GateCookie,
+    page: number = 1,
   ): Promise<GatePayment[]> {
     try {
       const cookiesArray = JSON.parse(gateCookie.cookie);
@@ -167,7 +168,7 @@ export class GateMonitoringService extends BaseService {
         .map((cookie) => `${cookie.name}=${cookie.value}`)
         .join("; ");
 
-      const response = await axios.get(this.GATE_API_URL, {
+      const response = await axios.get(`${this.GATE_API_URL}${page}`, {
         headers: {
           Accept: "application/json",
           "Content-Type": "application/json",
@@ -179,11 +180,29 @@ export class GateMonitoringService extends BaseService {
       return response.data?.response?.payouts?.data || [];
     } catch (error) {
       console.error(
-        `❌ Error fetching Gate transactions for user ${gateCookie.userId}:`,
+        `❌ Error fetching Gate transactions for user ${gateCookie.userId} on page ${page}:`,
         error,
       );
       return [];
     }
+  }
+
+  private async fetchAllGateTransactions(
+    gateCookie: GateCookie,
+  ): Promise<GatePayment[]> {
+    const maxPages = 10;
+    const allTransactions: GatePayment[] = [];
+
+    for (let page = 1; page <= maxPages; page++) {
+      const transactions = await this.fetchGateTransactions(gateCookie, page);
+      if (transactions.length === 0) {
+        break; // No more data available
+      }
+      allTransactions.push(...transactions);
+      await this.delay(500); // Small delay between page requests
+    }
+
+    return allTransactions;
   }
 
   private async processTransactions(
@@ -282,8 +301,8 @@ export class GateMonitoringService extends BaseService {
               continue;
             }
 
-            // Получаем транзакции
-            const transactions = await this.fetchGateTransactions(gateCookie);
+            // Получаем транзакции со всех страниц
+            const transactions = await this.fetchAllGateTransactions(gateCookie);
             console.log(
               `📦 Found ${transactions.length} Gate transactions for user ${gateCookie.userId}`,
             );
