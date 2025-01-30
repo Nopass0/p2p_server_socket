@@ -14,7 +14,7 @@ export class TransactionMatchingService extends BaseService {
 
   private async processUserTransactions(userId: number): Promise<number> {
     let matches = 0;
-    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000 * 20);
 
     try {
       // Get unprocessed P2P transactions from last 24 hours
