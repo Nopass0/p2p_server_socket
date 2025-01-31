@@ -52,6 +52,7 @@ export class TokenValidationService extends BaseService {
       });
       console.log(token);
       const orders = await response.json();
+      console.log(orders);
 
       for (const order of orders) {
         const existingOrder = await db.p2PTransaction.findFirst({
