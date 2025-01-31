@@ -57,6 +57,7 @@ model GateCookie {
   lastChecked DateTime @default(now())
   createdAt   DateTime @default(now())
   updatedAt   DateTime
+  idexId      String?
   User        User     @relation(fields: [userId], references: [id])
 
   @@unique([userId, cookie])
@@ -89,6 +90,7 @@ model GateTransaction {
   traderName       String?
   commissionRate   Float?
   initialBalance   Float?
+  idexId           String?
   User             User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   receipts         Receipt[]
   TransactionMatch TransactionMatch[]
@@ -195,6 +197,7 @@ model User {
   passportPhoto       String?
   deposit             Float                 @default(0)
   salaryPercentage    Float                 @default(0.5)
+  currentTgPhone      String?
   AdminAction         AdminAction[]
   Appeal              Appeal[]
   DeviceToken         DeviceToken[]
@@ -284,6 +287,7 @@ model P2PTransaction {
   completedAt      DateTime
   createdAt        DateTime           @default(now())
   processed        Boolean            @default(false)
+  currentTgPhone   String?
   User             User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   TransactionMatch TransactionMatch[]
 

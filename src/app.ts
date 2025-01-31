@@ -16,7 +16,7 @@ const serviceMonitor = new ServiceMonitor();
 const tokenService = new TokenValidationService(serviceMonitor);
 const matchingService = new TransactionMatchingService(serviceMonitor);
 const gateService = new GateMonitoringService(serviceMonitor);
-const receiptProcessor = new ReceiptProcessingService(serviceMonitor);
+// const receiptProcessor = new ReceiptProcessingService(serviceMonitor);
 
 // Общие CORS заголовки
 const corsHeaders = {
@@ -29,7 +29,7 @@ const corsHeaders = {
 tokenService.start().catch(console.error);
 matchingService.start().catch(console.error);
 gateService.start().catch(console.error);
-receiptProcessor.start().catch(console.error);
+// receiptProcessor.start().catch(console.error);
 
 const server = Bun.serve({
   async fetch(req) {

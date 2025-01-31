@@ -208,6 +208,7 @@ export class GateMonitoringService extends BaseService {
   private async processTransactions(
     userId: number,
     transactions: GatePayment[],
+    gateCookie: GateCookie,
   ): Promise<number> {
     let processedCount = 0;
     for (const transaction of transactions) {
@@ -253,6 +254,7 @@ export class GateMonitoringService extends BaseService {
               traderId: transaction.trader?.id || null,
               traderName: transaction.trader?.name || null,
               attachments: transaction.attachments || null, // Store attachments as JSON
+              idexId: gateCookie.idexId, // Add idexId from gateCookie
             },
           });
           console.log(
@@ -311,6 +313,7 @@ export class GateMonitoringService extends BaseService {
               const processed = await this.processTransactions(
                 gateCookie.userId,
                 transactions,
+                gateCookie,
               );
               processedTransactions += processed;
               processedUsers++;

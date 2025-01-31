@@ -37,6 +37,12 @@ export class TokenValidationService extends BaseService {
 
   private async processOrders(userId: number, token: string): Promise<void> {
     try {
+      // Get the user first to access currentTgPhone
+      const user = await db.user.findUnique({
+        where: { id: userId },
+        select: { currentTgPhone: true }
+      });
+
       const response = await fetch("http://127.0.0.1:9000/get_orders", {
         method: "POST",
         headers: {
@@ -76,6 +82,7 @@ export class TokenValidationService extends BaseService {
               method: order.payment_method || "unknown",
               completedAt: new Date(order.status_update_time),
               processed: false,
+              currentTgPhone: user?.currentTgPhone || null, // Add currentTgPhone from user
             },
           });
           console.log(
