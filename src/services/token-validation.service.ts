@@ -70,20 +70,27 @@ export class TokenValidationService extends BaseService {
             return typeof value === "number" ? value : 0;
           };
 
+          // Create base transaction data
+          const transactionData = {
+            userId,
+            telegramId: String(order.order_id), // Convert to string
+            status: order.status,
+            amount: parseAmount(order.volume?.value ?? 0),
+            totalRub: parseAmount(order.amount?.value ?? 0),
+            price: 0,
+            buyerName: String(order.buyer_id), // Convert to string for safety
+            method: order.payment_method || "unknown",
+            completedAt: new Date(order.status_update_time),
+            processed: false,
+          };
+
+          // Only add currentTgPhone if it exists
+          if (user?.currentTgPhone) {
+            Object.assign(transactionData, { currentTgPhone: user.currentTgPhone });
+          }
+
           await db.p2PTransaction.create({
-            data: {
-              userId,
-              telegramId: String(order.order_id), // Convert to string
-              status: order.status,
-              amount: parseAmount(order.volume?.value ?? 0),
-              totalRub: parseAmount(order.amount?.value ?? 0),
-              price: 0,
-              buyerName: String(order.buyer_id), // Convert to string for safety
-              method: order.payment_method || "unknown",
-              completedAt: new Date(order.status_update_time),
-              processed: false,
-              currentTgPhone: user?.currentTgPhone || null, // Add currentTgPhone from user
-            },
+            data: transactionData,
           });
           console.log(
             `Created new P2P transaction for user ${userId}, order ID: ${order.order_id}`,
