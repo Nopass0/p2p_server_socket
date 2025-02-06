@@ -254,7 +254,7 @@ export class GateMonitoringService extends BaseService {
                 traderId: transaction.trader?.id || null,
                 traderName: transaction.trader?.name || null,
                 attachments: transaction.attachments || null,
-                idexId: gateCookie.idexId,
+                idexId: transaction.trader?.id || null,
               },
             });
             console.log(
