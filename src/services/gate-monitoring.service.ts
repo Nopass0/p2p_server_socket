@@ -1,9 +1,9 @@
-// src/services/gate-monitoring.service.ts
 import { BaseService } from "./base.service";
 import db from "../db";
 import axios, { AxiosError } from "axios";
 import { ServiceMonitor } from "../utils/service-monitor";
 import type { GateCookie } from "@prisma/client";
+import { Prisma } from "@prisma/client"; // для проверки ошибки
 
 interface GatePayment {
   id: number;
@@ -89,11 +89,6 @@ export class GateMonitoringService extends BaseService {
     super("GateMonitoringService", monitor);
   }
 
-  /**
-   * Преобразует сохранённое значение куки в строку для передачи в заголовках.
-   * Если gateCookie.cookie является валидным JSON-массивом, то объединяет его в строку.
-   * В противном случае возвращает исходное значение.
-   */
   private getCookieString(gateCookie: GateCookie): string {
     try {
       const parsed = JSON.parse(gateCookie.cookie);
@@ -102,7 +97,6 @@ export class GateMonitoringService extends BaseService {
       }
       return String(gateCookie.cookie);
     } catch (error) {
-      // Если парсинг не удался – предполагаем, что куки уже в строковом формате.
       return String(gateCookie.cookie);
     }
   }
@@ -124,7 +118,6 @@ export class GateMonitoringService extends BaseService {
         response.status === 200 &&
         Array.isArray(response.data?.response?.payouts?.data);
 
-      // Обновляем статус куки в базе данных
       await db.gateCookie.update({
         where: { id: gateCookie.id },
         data: {
@@ -197,16 +190,16 @@ export class GateMonitoringService extends BaseService {
   private async fetchAllGateTransactions(
     gateCookie: GateCookie,
   ): Promise<GatePayment[]> {
-    const maxPages = 25; // Изменено с 10 на 25 страниц
+    const maxPages = 25;
     const allTransactions: GatePayment[] = [];
 
     for (let page = 1; page <= maxPages; page++) {
       const transactions = await this.fetchGateTransactions(gateCookie, page);
       if (transactions.length === 0) {
-        break; // Если на странице нет данных, прекращаем перебор
+        break;
       }
       allTransactions.push(...transactions);
-      await this.delay(500); // Небольшая задержка между запросами
+      await this.delay(500);
     }
 
     return allTransactions;
@@ -220,7 +213,6 @@ export class GateMonitoringService extends BaseService {
     let processedCount = 0;
     for (const transaction of transactions) {
       try {
-        // Проверяем, существует ли уже такая транзакция
         const existingTransaction = await db.gateTransaction.findFirst({
           where: {
             userId,
@@ -231,47 +223,62 @@ export class GateMonitoringService extends BaseService {
         console.log("🔍 Поиск транзакции", transaction.id);
 
         if (!existingTransaction) {
-          // Создаем новую транзакцию со всеми полями
-          await db.gateTransaction.create({
-            data: {
-              userId,
-              transactionId: String(transaction.id),
-              paymentMethodId: transaction.payment_method_id,
-              wallet: transaction.wallet,
-              amountRub: transaction.amount.trader["643"] || 0,
-              amountUsdt: transaction.amount.trader["000001"] || 0,
-              totalRub: transaction.total.trader["643"] || 0,
-              totalUsdt: transaction.total.trader["000001"] || 0,
-              status: transaction.status,
-              bankName: transaction.bank?.name || null,
-              bankCode: transaction.bank?.code?.toString() || null,
-              bankLabel: transaction.bank?.label || null,
-              paymentMethod: transaction.method?.label || null,
-              course: transaction.meta?.courses?.trader || null,
-              successCount: transaction.tooltip?.payments?.success || null,
-              successRate: transaction.tooltip?.payments?.percent || null,
-              approvedAt: transaction.approved_at
-                ? new Date(transaction.approved_at)
-                : null,
-              expiredAt: transaction.expired_at
-                ? new Date(transaction.expired_at)
-                : null,
-              createdAt: new Date(transaction.created_at),
-              updatedAt: new Date(transaction.updated_at),
-              traderId: transaction.trader?.id || null,
-              traderName: transaction.trader?.name || null,
-              attachments: transaction.attachments || null,
-              idexId: gateCookie.idexId,
-            },
-          });
-          console.log(
-            `✅ Added new Gate transaction: ${transaction.id} for user ${userId}`
-          );
-          processedCount++;
+          // Пытаемся создать новую транзакцию
+          try {
+            await db.gateTransaction.create({
+              data: {
+                userId,
+                transactionId: String(transaction.id),
+                paymentMethodId: transaction.payment_method_id,
+                wallet: transaction.wallet,
+                amountRub: transaction.amount.trader["643"] || 0,
+                amountUsdt: transaction.amount.trader["000001"] || 0,
+                totalRub: transaction.total.trader["643"] || 0,
+                totalUsdt: transaction.total.trader["000001"] || 0,
+                status: transaction.status,
+                bankName: transaction.bank?.name || null,
+                bankCode: transaction.bank?.code?.toString() || null,
+                bankLabel: transaction.bank?.label || null,
+                paymentMethod: transaction.method?.label || null,
+                course: transaction.meta?.courses?.trader || null,
+                successCount: transaction.tooltip?.payments?.success || null,
+                successRate: transaction.tooltip?.payments?.percent || null,
+                approvedAt: transaction.approved_at
+                  ? new Date(transaction.approved_at)
+                  : null,
+                expiredAt: transaction.expired_at
+                  ? new Date(transaction.expired_at)
+                  : null,
+                createdAt: new Date(transaction.created_at),
+                updatedAt: new Date(transaction.updated_at),
+                traderId: transaction.trader?.id || null,
+                traderName: transaction.trader?.name || null,
+                attachments: transaction.attachments || null,
+                idexId: gateCookie.idexId,
+              },
+            });
+            console.log(
+              `✅ Добавлена новая транзакция Gate: ${transaction.id} для пользователя ${userId}`
+            );
+            processedCount++;
+          } catch (error) {
+            if (
+              error instanceof Prisma.PrismaClientKnownRequestError &&
+              error.code === "P2002"
+            ) {
+              // Если ошибка из-за уникального ограничения, просто пропускаем запись
+              console.log(`⚠️ Транзакция с id ${transaction.id} уже существует, пропускаем.`);
+            } else {
+              console.error(
+                `❌ Ошибка при обработке транзакции ${transaction.id} для пользователя ${userId}:`,
+                error
+              );
+            }
+          }
         }
       } catch (error) {
         console.error(
-          `❌ Error processing transaction ${transaction.id} for user ${userId}:`,
+          `❌ Ошибка при поиске транзакции ${transaction.id} для пользователя ${userId}:`,
           error
         );
       }
@@ -286,36 +293,28 @@ export class GateMonitoringService extends BaseService {
 
     while (this.isRunning) {
       try {
-        console.log("🔄 Starting Gate monitoring cycle");
+        console.log("🔄 Запуск цикла мониторинга Gate");
         let processedUsers = 0;
         let processedTransactions = 0;
         let errors = 0;
 
-        // Получаем все активные куки
         const gateCookies = await db.gateCookie.findMany({
-          where: {
-            isActive: true,
-          },
+          where: { isActive: true },
         });
 
-        console.log(`👥 Processing ${gateCookies.length} active Gate cookies`);
+        console.log(`👥 Обработка ${gateCookies.length} активных куки Gate`);
 
         for (const gateCookie of gateCookies) {
           try {
-            // Проверяем валидность куки
             const isValid = await this.validateCookie(gateCookie);
-
             if (!isValid) {
               errors++;
               continue;
             }
-
-            // Получаем транзакции со всех страниц (до 25)
             const transactions = await this.fetchAllGateTransactions(gateCookie);
             console.log(
-              `📦 Found ${transactions.length} Gate transactions for user ${gateCookie.userId}`
+              `📦 Найдено ${transactions.length} транзакций Gate для пользователя ${gateCookie.userId}`
             );
-
             if (transactions.length > 0) {
               const processed = await this.processTransactions(
                 gateCookie.userId,
@@ -325,12 +324,10 @@ export class GateMonitoringService extends BaseService {
               processedTransactions += processed;
               processedUsers++;
             }
-
-            // Небольшая задержка между запросами
             await this.delay(1000);
           } catch (error) {
             console.error(
-              `❌ Error processing user ${gateCookie.userId}:`,
+              `❌ Ошибка при обработке пользователя ${gateCookie.userId}:`,
               error
             );
             errors++;
@@ -345,11 +342,9 @@ export class GateMonitoringService extends BaseService {
         });
 
         this.monitor.logStats(this.serviceName);
-
-        // Ждем 1 минуту перед следующим циклом
         await this.delay(60000);
       } catch (error) {
-        console.error("❌ Error in Gate monitoring cycle:", error);
+        console.error("❌ Ошибка в цикле мониторинга Gate:", error);
         this.updateServiceStats({ errors: 1 });
         await this.delay(60000);
       }
