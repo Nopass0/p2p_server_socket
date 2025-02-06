@@ -1,4 +1,3 @@
-// src/services/transaction-matching.service.ts
 import type { PrismaClient } from "@prisma/client";
 import { BaseService } from "./base.service";
 import prisma from "@/db";
@@ -14,69 +13,49 @@ export class TransactionMatchingService extends BaseService {
 
   private async processUserTransactions(userId: number): Promise<number> {
     let matches = 0;
-    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000 * 90);
+    // Рассматриваем транзакции за последние 90 дней
+    const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
 
     try {
-      // Get unprocessed P2P transactions from last 24 hours
+      // Получаем P2P-транзакции, относящиеся к данному пользователю, которые ещё не обработаны
       const p2pTransactions = await this.db.p2PTransaction.findMany({
         where: {
           userId,
           processed: false,
-          completedAt: { gt: oneDayAgo },
+          completedAt: { gt: ninetyDaysAgo },
         },
       });
-      console.log(
-        `Found ${p2pTransactions.length} unprocessed P2P transactions for user ${userId}`,
-      );
+      console.log(`Найдено ${p2pTransactions.length} необработанных P2P транзакций для пользователя ${userId}`);
 
-      // Get all approved Gate transactions
+      // Получаем все одобренные Gate транзакции (approvedAt не null)
       const gateTransactions = await this.db.gateTransaction.findMany({
-        where: {
-          userId,
-          approvedAt: { not: null },
-        },
+        where: { approvedAt: { not: null } },
       });
-      console.log(
-        `Found ${gateTransactions.length} approved Gate transactions for user ${userId}`,
-      );
+      console.log(`Найдено ${gateTransactions.length} одобренных Gate транзакций для мэтчинга`);
 
-      // Process each P2P transaction
       for (const p2pTx of p2pTransactions) {
-        console.log(`\nProcessing P2P transaction ${p2pTx.id}:`);
-        console.log(`  Amount: ${p2pTx.totalRub} RUB`);
-        console.log(`  Completed at: ${p2pTx.completedAt}`);
+        console.log(`\nОбработка P2P транзакции ${p2pTx.id}:`);
+        console.log(`  Сумма: ${p2pTx.totalRub} RUB`);
+        console.log(`  Завершена в: ${p2pTx.completedAt}`);
 
-        // Try to find matching Gate transaction
         for (const gateTx of gateTransactions) {
           if (!gateTx.approvedAt) {
-            console.log(
-              `Skipping Gate transaction ${gateTx.id} - no approvedAt timestamp`,
-            );
+            console.log(`Пропуск Gate транзакции ${gateTx.id} – отсутствует approvedAt`);
             continue;
           }
 
+          // Вычисляем разницу по времени в минутах
           const timeDiffMinutes = Math.abs(
-            (p2pTx.completedAt.getTime() - gateTx.approvedAt.getTime()) /
-              (1000 * 60),
+            (p2pTx.completedAt.getTime() - new Date(gateTx.approvedAt).getTime()) / (1000 * 60)
           );
 
-          // console.log(`\nComparing with Gate transaction ${gateTx.id}:`);
-          // console.log(
-          //   `  Time difference: ${timeDiffMinutes.toFixed(2)} minutes`,
-          // );
-          // console.log(`  P2P amount: ${p2pTx.totalRub} RUB`);
-          // console.log(`  Gate amount: ${gateTx.amountRub} RUB`);
-          // console.log(
-          //   `  Amount difference: ${Math.abs(p2pTx.totalRub - gateTx.amountRub)} RUB`,
-          // );
-
-          // Check if transactions match our criteria
+          // Если разница не превышает 30 минут и сумма транзакций совпадает (с точностью до 0.01)
           if (
             timeDiffMinutes <= 30 &&
             Math.abs(p2pTx.totalRub - gateTx.amountRub) < 0.01
           ) {
             try {
-              // Create match record and mark P2P transaction as processed
+              // В рамках одной транзакции создаём мэтч и помечаем P2P транзакцию как обработанную
               await this.db.$transaction([
                 this.db.transactionMatch.create({
                   data: {
@@ -92,110 +71,74 @@ export class TransactionMatchingService extends BaseService {
                   data: { processed: true },
                 }),
               ]);
-
               matches++;
-              console.log(`✅ Successfully matched transactions:`);
-              // console.log(`   P2P ID: ${p2pTx.id}`);
-              // console.log(`   Gate ID: ${gateTx.id}`);
-              break; // Move to next P2P transaction after finding a match
+              console.log(`✅ Мэтч найден: P2P ${p2pTx.id} с Gate ${gateTx.id}`);
+              // Если мэтч найден, выходим из внутреннего цикла для данной P2P транзакции
+              break;
             } catch (error) {
-              console.error(`❌ Error saving transaction match:`, error);
-              // Continue processing other transactions even if one fails
+              console.error(`❌ Ошибка при создании мэтча для пользователя ${userId} (P2P ${p2pTx.id}, Gate ${gateTx.id}):`, error);
             }
-          } else {
-            // console.log(`❌ No match - Criteria not met:`);
-            // console.log(`   Time diff > 30 min: ${timeDiffMinutes > 30}`);
-            // console.log(
-            //   `   Amount diff ≥ 0.01: ${Math.abs(p2pTx.totalRub - gateTx.amountRub) >= 0.01}`,
-            // );
           }
         }
       }
 
       return matches;
     } catch (error) {
-      console.error(
-        `❌ Error processing transactions for user ${userId}:`,
-        error,
-      );
-      throw error; // Re-throw to be handled by caller
+      console.error(`❌ Ошибка при обработке транзакций для пользователя ${userId}:`, error);
+      throw error;
     }
   }
 
   async start(): Promise<void> {
     if (this.isRunning) {
-      console.log("🟨 Service is already running");
+      console.log("🟨 Сервис мэтчинга уже запущен");
       return;
     }
-
-    console.log("🟢 Starting Transaction Matching Service");
+    console.log("🟢 Запуск сервиса Transaction Matching");
     this.isRunning = true;
     this.updateServiceStats({ isRunning: true });
 
     while (this.isRunning) {
       try {
-        console.log("\n🔄 Starting transaction matching cycle");
+        console.log("\n🔄 Запуск цикла мэтчинга транзакций");
         let processedUsers = 0;
         let processedTransactions = 0;
         let errors = 0;
 
-        // Get all users
         const users = await this.db.user.findMany({
-          select: {
-            id: true,
-            username: true,
-            login: true
-          },
+          select: { id: true, username: true, login: true },
         });
+        console.log(`👥 Обработка ${users.length} пользователей для мэтчинга`);
 
-        console.log(
-          `👥 Processing ${users.length} users for transaction matching`,
-        );
-
-        // Process each user
         for (const user of users) {
           try {
-            console.log(
-              `\n📝 Processing user ${user.id} (${user.login})`,
-            );
-            const matches = await this.processUserTransactions(user.id);
+            console.log(`\n📝 Обработка пользователя ${user.id} (${user.login})`);
+            const userMatches = await this.processUserTransactions(user.id);
             processedUsers++;
-            processedTransactions += matches;
-            console.log(
-              `✅ Completed processing user ${user.id} - found ${matches} matches`,
-            );
+            processedTransactions += userMatches;
+            console.log(`✅ Пользователь ${user.id} обработан – найдено ${userMatches} мэтчей`);
           } catch (error) {
-            console.error(`❌ Error processing user ${user.id}:`, error);
+            console.error(`❌ Ошибка при обработке пользователя ${user.id}:`, error);
             errors++;
           }
-
-          // Delay between processing users
           await this.delay(1000);
         }
 
-        // Update service statistics
         this.updateServiceStats({
           processedUsers,
           processedTransactions,
           errors,
           lastRunTime: new Date(),
         });
-
-        // Log final statistics for this cycle
-        console.log("\n📊 Cycle Summary:");
-        console.log(`   Processed Users: ${processedUsers}`);
-        console.log(`   Matched Transactions: ${processedTransactions}`);
-        console.log(`   Errors: ${errors}`);
+        console.log("\n📊 Итог цикла:");
+        console.log(`   Обработано пользователей: ${processedUsers}`);
+        console.log(`   Мэтчей найдено: ${processedTransactions}`);
+        console.log(`   Ошибок: ${errors}`);
 
         this.monitor.logStats(this.serviceName);
-
-        // Wait before starting next cycle
         await this.delay(60000);
       } catch (error) {
-        console.error(
-          "❌ Critical error in transaction matching cycle:",
-          error,
-        );
+        console.error("❌ Критическая ошибка в цикле мэтчинга транзакций:", error);
         this.updateServiceStats({ errors: 1 });
         await this.delay(60000);
       }
@@ -203,7 +146,7 @@ export class TransactionMatchingService extends BaseService {
   }
 
   stop(): void {
-    console.log("🔴 Stopping Transaction Matching Service");
+    console.log("🔴 Остановка сервиса Transaction Matching");
     this.isRunning = false;
     this.updateServiceStats({ isRunning: false });
   }
