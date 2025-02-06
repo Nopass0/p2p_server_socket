@@ -95,19 +95,19 @@ export class TransactionMatchingService extends BaseService {
 
               matches++;
               console.log(`✅ Successfully matched transactions:`);
-              console.log(`   P2P ID: ${p2pTx.id}`);
-              console.log(`   Gate ID: ${gateTx.id}`);
+              // console.log(`   P2P ID: ${p2pTx.id}`);
+              // console.log(`   Gate ID: ${gateTx.id}`);
               break; // Move to next P2P transaction after finding a match
             } catch (error) {
               console.error(`❌ Error saving transaction match:`, error);
               // Continue processing other transactions even if one fails
             }
           } else {
-            console.log(`❌ No match - Criteria not met:`);
-            console.log(`   Time diff > 30 min: ${timeDiffMinutes > 30}`);
-            console.log(
-              `   Amount diff ≥ 0.01: ${Math.abs(p2pTx.totalRub - gateTx.amountRub) >= 0.01}`,
-            );
+            // console.log(`❌ No match - Criteria not met:`);
+            // console.log(`   Time diff > 30 min: ${timeDiffMinutes > 30}`);
+            // console.log(
+            //   `   Amount diff ≥ 0.01: ${Math.abs(p2pTx.totalRub - gateTx.amountRub) >= 0.01}`,
+            // );
           }
         }
       }
