@@ -60,15 +60,15 @@ export class TransactionMatchingService extends BaseService {
               (1000 * 60),
           );
 
-          console.log(`\nComparing with Gate transaction ${gateTx.id}:`);
-          console.log(
-            `  Time difference: ${timeDiffMinutes.toFixed(2)} minutes`,
-          );
-          console.log(`  P2P amount: ${p2pTx.totalRub} RUB`);
-          console.log(`  Gate amount: ${gateTx.amountRub} RUB`);
-          console.log(
-            `  Amount difference: ${Math.abs(p2pTx.totalRub - gateTx.amountRub)} RUB`,
-          );
+          // console.log(`\nComparing with Gate transaction ${gateTx.id}:`);
+          // console.log(
+          //   `  Time difference: ${timeDiffMinutes.toFixed(2)} minutes`,
+          // );
+          // console.log(`  P2P amount: ${p2pTx.totalRub} RUB`);
+          // console.log(`  Gate amount: ${gateTx.amountRub} RUB`);
+          // console.log(
+          //   `  Amount difference: ${Math.abs(p2pTx.totalRub - gateTx.amountRub)} RUB`,
+          // );
 
           // Check if transactions match our criteria
           if (
