@@ -160,7 +160,7 @@ export class GateMonitoringService extends BaseService {
       return false;
     }
   }
-
+ 
   private async fetchGateTransactions(
     gateCookie: GateCookie,
     page: number = 1,
@@ -205,211 +205,225 @@ export class GateMonitoringService extends BaseService {
     return allTransactions;
   }
 
-  private async processTransactions(
-    userId: number,
-    transactions: GatePayment[],
-    gateCookie: GateCookie,
-  ): Promise<number> {
-    let processedCount = 0;
-    for (const transaction of transactions) {
-      try {
-        // Ищем запись по transactionId (без учёта userId)
-        const existingTransaction = await db.gateTransaction.findFirst({
-          where: {
-            transactionId: String(transaction.id),
-          },
-        });
-  
-        console.log("🔍 Поиск транзакции", transaction.id);
-  
-        if (!existingTransaction) {
-          // Если транзакция отсутствует в базе, создаём новую для данного пользователя
-          try {
-            await db.gateTransaction.create({
-              data: {
-                userId,
-                transactionId: String(transaction.id),
-                paymentMethodId: transaction.payment_method_id,
-                wallet: transaction.wallet,
-                amountRub: transaction.amount.trader["643"] || 0,
-                amountUsdt: transaction.amount.trader["000001"] || 0,
-                totalRub: transaction.total.trader["643"] || 0,
-                totalUsdt: transaction.total.trader["000001"] || 0,
-                status: transaction.status,
-                bankName: transaction.bank?.name || null,
-                bankCode: transaction.bank?.code?.toString() || null,
-                bankLabel: transaction.bank?.label || null,
-                paymentMethod: transaction.method?.label || null,
-                course: transaction.meta?.courses?.trader || null,
-                successCount: transaction.tooltip?.payments?.success || null,
-                successRate: transaction.tooltip?.payments?.percent || null,
-                approvedAt: transaction.approved_at ? new Date(transaction.approved_at) : null,
-                expiredAt: transaction.expired_at ? new Date(transaction.expired_at) : null,
-                createdAt: new Date(transaction.created_at),
-                updatedAt: new Date(transaction.updated_at),
-                traderId: transaction.trader?.id || null,
-                traderName: transaction.trader?.name || null,
-                attachments: transaction.attachments || null,
-                idexId: String(transaction.trader?.id) || null,
-              },
-            });
-            console.log(
-              `✅ Добавлена новая транзакция Gate: ${transaction.id} для пользователя ${userId}`
+// Изменённая функция processTransactions возвращает объект с количеством обработанных транзакций и общим числом транзакций.
+private async processTransactions(
+  userId: number,
+  transactions: GatePayment[],
+  gateCookie: GateCookie,
+): Promise<{ processed: number; total: number }> {
+  let processedCount = 0;
+  for (const transaction of transactions) {
+    try {
+      // Ищем запись по transactionId (без фильтра по userId)
+      const existingTransaction = await db.gateTransaction.findFirst({
+        where: {
+          transactionId: String(transaction.id),
+        },
+      });
+
+      console.log("🔍 Поиск транзакции", transaction.id);
+
+      if (!existingTransaction) {
+        // Если транзакция отсутствует – создаём новую для данного пользователя
+        try {
+          await db.gateTransaction.create({
+            data: {
+              userId,
+              transactionId: String(transaction.id),
+              paymentMethodId: transaction.payment_method_id,
+              wallet: transaction.wallet,
+              amountRub: transaction.amount.trader["643"] || 0,
+              amountUsdt: transaction.amount.trader["000001"] || 0,
+              totalRub: transaction.total.trader["643"] || 0,
+              totalUsdt: transaction.total.trader["000001"] || 0,
+              status: transaction.status,
+              bankName: transaction.bank?.name || null,
+              bankCode: transaction.bank?.code?.toString() || null,
+              bankLabel: transaction.bank?.label || null,
+              paymentMethod: transaction.method?.label || null,
+              course: transaction.meta?.courses?.trader || null,
+              successCount: transaction.tooltip?.payments?.success || null,
+              successRate: transaction.tooltip?.payments?.percent || null,
+              approvedAt: transaction.approved_at ? new Date(transaction.approved_at) : null,
+              expiredAt: transaction.expired_at ? new Date(transaction.expired_at) : null,
+              createdAt: new Date(transaction.created_at),
+              updatedAt: new Date(transaction.updated_at),
+              traderId: transaction.trader?.id || null,
+              traderName: transaction.trader?.name || null,
+              attachments: transaction.attachments || null,
+              idexId: String(transaction.trader?.id) || null,
+            },
+          });
+          console.log(
+            `✅ Добавлена новая транзакция Gate: ${transaction.id} для пользователя ${userId}`
+          );
+          processedCount++;
+        } catch (error) {
+          if (
+            error instanceof Prisma.PrismaClientKnownRequestError &&
+            error.code === "P2002"
+          ) {
+            console.log(`⚠️ Транзакция с id ${transaction.id} уже существует, пропускаем.`);
+          } else {
+            console.error(
+              `❌ Ошибка при создании транзакции ${transaction.id} для пользователя ${userId}:`,
+              error
             );
-            processedCount++;
-          } catch (error) {
-            if (
-              error instanceof Prisma.PrismaClientKnownRequestError &&
-              error.code === "P2002"
-            ) {
-              console.log(`⚠️ Транзакция с id ${transaction.id} уже существует, пропускаем.`);
-            } else {
+          }
+        }
+      } else {
+        // Если запись с таким transactionId уже существует,
+        // проверяем, прошло ли с момента её создания более 5 минут.
+        const createdAt = new Date(existingTransaction.createdAt);
+        const now = new Date();
+        const diffMs = now.getTime() - createdAt.getTime();
+        if (diffMs > 5 * 60 * 1000) {
+          // Если прошло более 5 минут – проверяем наличие связи в TransactionMatch
+          const existingMatch = await db.transactionMatch.findFirst({
+            where: {
+              gateTxId: existingTransaction.id,
+            },
+          });
+          if (existingMatch) {
+            console.log(
+              `⚠️ Для транзакции ${transaction.id} уже существует связь в TransactionMatch, пропускаем создание новой транзакции.`
+            );
+          } else {
+            // Если связи нет – создаём новую транзакцию для данного пользователя с тем же transactionId
+            try {
+              await db.gateTransaction.create({
+                data: {
+                  userId,
+                  transactionId: String(transaction.id),
+                  paymentMethodId: transaction.payment_method_id,
+                  wallet: transaction.wallet,
+                  amountRub: transaction.amount.trader["643"] || 0,
+                  amountUsdt: transaction.amount.trader["000001"] || 0,
+                  totalRub: transaction.total.trader["643"] || 0,
+                  totalUsdt: transaction.total.trader["000001"] || 0,
+                  status: transaction.status,
+                  bankName: transaction.bank?.name || null,
+                  bankCode: transaction.bank?.code?.toString() || null,
+                  bankLabel: transaction.bank?.label || null,
+                  paymentMethod: transaction.method?.label || null,
+                  course: transaction.meta?.courses?.trader || null,
+                  successCount: transaction.tooltip?.payments?.success || null,
+                  successRate: transaction.tooltip?.payments?.percent || null,
+                  approvedAt: transaction.approved_at ? new Date(transaction.approved_at) : null,
+                  expiredAt: transaction.expired_at ? new Date(transaction.expired_at) : null,
+                  createdAt: new Date(transaction.created_at),
+                  updatedAt: new Date(transaction.updated_at),
+                  traderId: transaction.trader?.id || null,
+                  traderName: transaction.trader?.name || null,
+                  attachments: transaction.attachments || null,
+                  idexId: String(transaction.trader?.id) || null,
+                },
+              });
+              console.log(
+                `✅ Создана дополнительная транзакция Gate с transactionId ${transaction.id} для пользователя ${userId}`
+              );
+              processedCount++;
+            } catch (error) {
               console.error(
-                `❌ Ошибка при создании транзакции ${transaction.id} для пользователя ${userId}:`,
+                `❌ Ошибка при создании дополнительной транзакции ${transaction.id} для пользователя ${userId}:`,
                 error
               );
             }
           }
         } else {
-          // Если запись с таким transactionId уже существует,
-          // проверяем, прошло ли с момента создания более 5 минут.
-          const createdAt = new Date(existingTransaction.createdAt);
-          const now = new Date();
-          const diffMs = now.getTime() - createdAt.getTime();
-          if (diffMs > 5 * 60 * 1000) {
-            // Если прошло более 5 минут – проверяем, есть ли связь с TransactionMatch
-            const existingMatch = await db.transactionMatch.findFirst({
-              where: {
-                gateTxId: existingTransaction.id,
-              },
-            });
-            if (existingMatch) {
-              console.log(
-                `⚠️ Для транзакции ${transaction.id} уже существует связь в TransactionMatch, пропускаем создание новой транзакции.`
-              );
-            } else {
-              // Если связи нет – создаём новую транзакцию для данного пользователя с тем же transactionId
-              try {
-                await db.gateTransaction.create({
-                  data: {
-                    userId,
-                    transactionId: String(transaction.id),
-                    paymentMethodId: transaction.payment_method_id,
-                    wallet: transaction.wallet,
-                    amountRub: transaction.amount.trader["643"] || 0,
-                    amountUsdt: transaction.amount.trader["000001"] || 0,
-                    totalRub: transaction.total.trader["643"] || 0,
-                    totalUsdt: transaction.total.trader["000001"] || 0,
-                    status: transaction.status,
-                    bankName: transaction.bank?.name || null,
-                    bankCode: transaction.bank?.code?.toString() || null,
-                    bankLabel: transaction.bank?.label || null,
-                    paymentMethod: transaction.method?.label || null,
-                    course: transaction.meta?.courses?.trader || null,
-                    successCount: transaction.tooltip?.payments?.success || null,
-                    successRate: transaction.tooltip?.payments?.percent || null,
-                    approvedAt: transaction.approved_at ? new Date(transaction.approved_at) : null,
-                    expiredAt: transaction.expired_at ? new Date(transaction.expired_at) : null,
-                    createdAt: new Date(transaction.created_at),
-                    updatedAt: new Date(transaction.updated_at),
-                    traderId: transaction.trader?.id || null,
-                    traderName: transaction.trader?.name || null,
-                    attachments: transaction.attachments || null,
-                    idexId: String(transaction.trader?.id) || null,
-                  },
-                });
-                console.log(
-                  `✅ Создана дополнительная транзакция Gate с transactionId ${transaction.id} для пользователя ${userId}`
-                );
-                processedCount++;
-              } catch (error) {
-                console.error(
-                  `❌ Ошибка при создании дополнительной транзакции ${transaction.id} для пользователя ${userId}:`,
-                  error
-                );
-              }
-            }
-          } else {
-            console.log(
-              `ℹ️ Транзакция ${transaction.id} создана менее 5 минут назад – пропускаем.`
-            );
-          }
+          console.log(
+            `ℹ️ Транзакция ${transaction.id} создана менее 5 минут назад – пропускаем.`
+          );
         }
-      } catch (error) {
-        console.error(
-          `❌ Ошибка при обработке транзакции ${transaction.id} для пользователя ${userId}:`,
-          error
-        );
       }
+    } catch (error) {
+      console.error(
+        `❌ Ошибка при обработке транзакции ${transaction.id} для пользователя ${userId}:`,
+        error
+      );
     }
-    return processedCount;
   }
+  return { processed: processedCount, total: transactions.length };
+}
+
   
 
-  async start(): Promise<void> {
-    if (this.isRunning) return;
-    this.isRunning = true;
-    this.updateServiceStats({ isRunning: true });
+async start(): Promise<void> {
+  if (this.isRunning) return;
+  this.isRunning = true;
+  this.updateServiceStats({ isRunning: true });
 
-    while (this.isRunning) {
-      try {
-        console.log("🔄 Запуск цикла мониторинга Gate");
-        let processedUsers = 0;
-        let processedTransactions = 0;
-        let errors = 0;
+  while (this.isRunning) {
+    try {
+      console.log("🔄 Запуск цикла мониторинга Gate");
+      let processedUsers = 0;
+      let processedTransactions = 0;
+      let errors = 0;
 
-        const gateCookies = await db.gateCookie.findMany({
-          where: { isActive: true },
-        });
+      const gateCookies = await db.gateCookie.findMany({
+        where: { isActive: true },
+      });
 
-        console.log(`👥 Обработка ${gateCookies.length} активных куки Gate`);
+      console.log(`👥 Обработка ${gateCookies.length} активных куки Gate`);
 
-        for (const gateCookie of gateCookies) {
-          try {
-            const isValid = await this.validateCookie(gateCookie);
-            if (!isValid) {
-              errors++;
-              continue;
-            }
-            const transactions = await this.fetchAllGateTransactions(gateCookie);
-            console.log(
-              `📦 Найдено ${transactions.length} транзакций Gate для пользователя ${gateCookie.userId}`
-            );
-            if (transactions.length > 0) {
-              const processed = await this.processTransactions(
-                gateCookie.userId,
-                transactions,
-                gateCookie
-              );
-              processedTransactions += processed;
-              processedUsers++;
-            }
-            await this.delay(1000);
-          } catch (error) {
-            console.error(
-              `❌ Ошибка при обработке пользователя ${gateCookie.userId}:`,
-              error
-            );
+      for (const gateCookie of gateCookies) {
+        try {
+          const isValid = await this.validateCookie(gateCookie);
+          if (!isValid) {
             errors++;
+            continue;
           }
+          const transactions = await this.fetchAllGateTransactions(gateCookie);
+          console.log(
+            `📦 Найдено ${transactions.length} транзакций Gate для пользователя ${gateCookie.userId}`
+          );
+          if (transactions.length > 0) {
+            const { processed, total } = await this.processTransactions(
+              gateCookie.userId,
+              transactions,
+              gateCookie
+            );
+            console.log(
+              `Обработано ${processed} из ${total} транзакций для пользователя ${gateCookie.userId}`
+            );
+            processedTransactions += processed;
+            processedUsers++;
+            // Если не все транзакции для текущего пользователя обработаны,
+            // прекращаем обработку для остальных (так как эти транзакции будут обработаны в будущем).
+            if (processed < total) {
+              console.log(
+                `⚠️ Не все транзакции для пользователя ${gateCookie.userId} обработаны – прекращаем цикл обработки текущей итерации.`
+              );
+              break;
+            }
+          }
+          await this.delay(1000);
+        } catch (error) {
+          console.error(
+            `❌ Ошибка при обработке пользователя ${gateCookie.userId}:`,
+            error
+          );
+          errors++;
         }
-
-        this.updateServiceStats({
-          processedUsers,
-          processedTransactions,
-          errors,
-          lastRunTime: new Date(),
-        });
-
-        this.monitor.logStats(this.serviceName);
-        await this.delay(60000);
-      } catch (error) {
-        console.error("❌ Ошибка в цикле мониторинга Gate:", error);
-        this.updateServiceStats({ errors: 1 });
-        await this.delay(60000);
       }
+
+      this.updateServiceStats({
+        processedUsers,
+        processedTransactions,
+        errors,
+        lastRunTime: new Date(),
+      });
+
+      this.monitor.logStats(this.serviceName);
+      await this.delay(60000);
+    } catch (error) {
+      console.error("❌ Ошибка в цикле мониторинга Gate:", error);
+      this.updateServiceStats({ errors: 1 });
+      await this.delay(60000);
     }
   }
+}
+
 
   stop(): void {
     this.isRunning = false;
