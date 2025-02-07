@@ -15,7 +15,7 @@ import { getReceiptPath } from "./utils/receipts";
 const serviceMonitor = new ServiceMonitor();
 const tokenService = new TokenValidationService(serviceMonitor);
 const matchingService = new TransactionMatchingService(serviceMonitor);
-const gateService = new GateMonitoringService(serviceMonitor);
+const gateService = new GateMonitoringService(serviceMonitor, matchingService);
 // const receiptProcessor = new ReceiptProcessingService(serviceMonitor);
 
 // Общие CORS заголовки
@@ -40,7 +40,7 @@ const server = Bun.serve({
       });
     }
 
-    // Handle HTTP endpoints
+    // HTTP endpoint: получение статистики сервиса
     if (req.url.endsWith("/api/service-stats")) {
       const stats = Object.fromEntries(serviceMonitor.getAllStats());
       return new Response(JSON.stringify(stats, null, 2), {
@@ -69,25 +69,19 @@ const server = Bun.serve({
       try {
         const filePath = await getReceiptPath(receiptId);
         const file = await Bun.file(filePath);
-
-        // Определяем, это скачивание или просмотр
         const isDownload = req.url.includes("/download");
-
         const headers = {
           ...corsHeaders,
           "Content-Type": "application/pdf",
           "X-Content-Type-Options": "nosniff",
           "Cache-Control": "public, max-age=31536000",
         };
-
-        // Для скачивания добавляем специальный заголовок
         if (isDownload) {
           headers["Content-Disposition"] =
             `attachment; filename="receipt_${receiptId}.pdf"`;
         } else {
           headers["Content-Disposition"] = "inline";
         }
-
         return new Response(file, { headers });
       } catch (error) {
         console.error(`Error serving receipt ${receiptId}:`, error);
@@ -101,16 +95,14 @@ const server = Bun.serve({
     // Handle WebSocket upgrade
     if (req.headers.get("upgrade") === "websocket") {
       const success = server.upgrade(req);
-      if (success) {
-        return undefined;
-      }
+      if (success) return undefined;
       return new Response("Upgrade failed", {
         status: 500,
         headers: corsHeaders,
       });
     }
 
-    // Возвращаем 404 для всех остальных запросов
+    // Все остальные запросы возвращают 404
     return new Response("Not Found", {
       status: 404,
       headers: corsHeaders,
@@ -130,21 +122,17 @@ const server = Bun.serve({
             await handleScreenshot(ws, data);
             break;
           default:
-            ws.send(
-              JSON.stringify({
-                type: "error",
-                message: "Unknown message type",
-              }),
-            );
+            ws.send(JSON.stringify({
+              type: "error",
+              message: "Unknown message type",
+            }));
         }
       } catch (error) {
         console.error("❌ Ошибка:", error);
-        ws.send(
-          JSON.stringify({
-            type: "error",
-            message: "Internal server error",
-          }),
-        );
+        ws.send(JSON.stringify({
+          type: "error",
+          message: "Internal server error",
+        }));
       }
     },
     open(ws: MyWebSocket) {
