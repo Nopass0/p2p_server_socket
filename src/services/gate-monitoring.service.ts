@@ -213,17 +213,17 @@ export class GateMonitoringService extends BaseService {
     let processedCount = 0;
     for (const transaction of transactions) {
       try {
+        // Ищем запись по transactionId (без учёта userId)
         const existingTransaction = await db.gateTransaction.findFirst({
           where: {
-            userId,
             transactionId: String(transaction.id),
           },
         });
-
+  
         console.log("🔍 Поиск транзакции", transaction.id);
-
+  
         if (!existingTransaction) {
-          // Пытаемся создать новую транзакцию
+          // Если транзакция отсутствует в базе, создаём новую для данного пользователя
           try {
             await db.gateTransaction.create({
               data: {
@@ -243,12 +243,8 @@ export class GateMonitoringService extends BaseService {
                 course: transaction.meta?.courses?.trader || null,
                 successCount: transaction.tooltip?.payments?.success || null,
                 successRate: transaction.tooltip?.payments?.percent || null,
-                approvedAt: transaction.approved_at
-                  ? new Date(transaction.approved_at)
-                  : null,
-                expiredAt: transaction.expired_at
-                  ? new Date(transaction.expired_at)
-                  : null,
+                approvedAt: transaction.approved_at ? new Date(transaction.approved_at) : null,
+                expiredAt: transaction.expired_at ? new Date(transaction.expired_at) : null,
                 createdAt: new Date(transaction.created_at),
                 updatedAt: new Date(transaction.updated_at),
                 traderId: transaction.trader?.id || null,
@@ -266,25 +262,89 @@ export class GateMonitoringService extends BaseService {
               error instanceof Prisma.PrismaClientKnownRequestError &&
               error.code === "P2002"
             ) {
-              // Если ошибка из-за уникального ограничения, просто пропускаем запись
               console.log(`⚠️ Транзакция с id ${transaction.id} уже существует, пропускаем.`);
             } else {
               console.error(
-                `❌ Ошибка при обработке транзакции ${transaction.id} для пользователя ${userId}:`,
+                `❌ Ошибка при создании транзакции ${transaction.id} для пользователя ${userId}:`,
                 error
               );
             }
           }
+        } else {
+          // Если запись с таким transactionId уже существует,
+          // проверяем, прошло ли с момента создания более 5 минут.
+          const createdAt = new Date(existingTransaction.createdAt);
+          const now = new Date();
+          const diffMs = now.getTime() - createdAt.getTime();
+          if (diffMs > 5 * 60 * 1000) {
+            // Если прошло более 5 минут – проверяем, есть ли связь с TransactionMatch
+            const existingMatch = await db.transactionMatch.findFirst({
+              where: {
+                gateTxId: existingTransaction.id,
+              },
+            });
+            if (existingMatch) {
+              console.log(
+                `⚠️ Для транзакции ${transaction.id} уже существует связь в TransactionMatch, пропускаем создание новой транзакции.`
+              );
+            } else {
+              // Если связи нет – создаём новую транзакцию для данного пользователя с тем же transactionId
+              try {
+                await db.gateTransaction.create({
+                  data: {
+                    userId,
+                    transactionId: String(transaction.id),
+                    paymentMethodId: transaction.payment_method_id,
+                    wallet: transaction.wallet,
+                    amountRub: transaction.amount.trader["643"] || 0,
+                    amountUsdt: transaction.amount.trader["000001"] || 0,
+                    totalRub: transaction.total.trader["643"] || 0,
+                    totalUsdt: transaction.total.trader["000001"] || 0,
+                    status: transaction.status,
+                    bankName: transaction.bank?.name || null,
+                    bankCode: transaction.bank?.code?.toString() || null,
+                    bankLabel: transaction.bank?.label || null,
+                    paymentMethod: transaction.method?.label || null,
+                    course: transaction.meta?.courses?.trader || null,
+                    successCount: transaction.tooltip?.payments?.success || null,
+                    successRate: transaction.tooltip?.payments?.percent || null,
+                    approvedAt: transaction.approved_at ? new Date(transaction.approved_at) : null,
+                    expiredAt: transaction.expired_at ? new Date(transaction.expired_at) : null,
+                    createdAt: new Date(transaction.created_at),
+                    updatedAt: new Date(transaction.updated_at),
+                    traderId: transaction.trader?.id || null,
+                    traderName: transaction.trader?.name || null,
+                    attachments: transaction.attachments || null,
+                    idexId: String(transaction.trader?.id) || null,
+                  },
+                });
+                console.log(
+                  `✅ Создана дополнительная транзакция Gate с transactionId ${transaction.id} для пользователя ${userId}`
+                );
+                processedCount++;
+              } catch (error) {
+                console.error(
+                  `❌ Ошибка при создании дополнительной транзакции ${transaction.id} для пользователя ${userId}:`,
+                  error
+                );
+              }
+            }
+          } else {
+            console.log(
+              `ℹ️ Транзакция ${transaction.id} создана менее 5 минут назад – пропускаем.`
+            );
+          }
         }
       } catch (error) {
         console.error(
-          `❌ Ошибка при поиске транзакции ${transaction.id} для пользователя ${userId}:`,
+          `❌ Ошибка при обработке транзакции ${transaction.id} для пользователя ${userId}:`,
           error
         );
       }
     }
     return processedCount;
   }
+  
 
   async start(): Promise<void> {
     if (this.isRunning) return;
