@@ -415,11 +415,11 @@ async start(): Promise<void> {
       });
 
       this.monitor.logStats(this.serviceName);
-      await this.delay(60000);
+      await this.delay(60000*5);
     } catch (error) {
       console.error("❌ Ошибка в цикле мониторинга Gate:", error);
       this.updateServiceStats({ errors: 1 });
-      await this.delay(60000);
+      await this.delay(60000*5);
     }
   }
 }
