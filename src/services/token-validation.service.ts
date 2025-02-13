@@ -2,6 +2,7 @@
 import { BaseService } from "./base.service";
 import db from "../db";
 import type { TokenValidationResult } from "../types/services";
+import type { ServiceMonitor } from "@/utils/service-monitor";
 
 export class TokenValidationService extends BaseService {
   constructor(monitor: ServiceMonitor) {
@@ -50,9 +51,9 @@ export class TokenValidationService extends BaseService {
         },
         body: `token=${encodeURIComponent(token)}`,
       });
-      console.log(token);
+      
       const orders = await response.json();
-      console.log(orders);
+      console.log(`📦 Найдено ${orders.length} транзакций для user#${userId}`);
 
       for (const order of orders) {
         const existingOrder = await db.p2PTransaction.findFirst({
@@ -148,7 +149,7 @@ export class TokenValidationService extends BaseService {
             errors++;
           }
 
-          await this.delay(1000);
+          await this.delay(100);
         }
 
         this.updateServiceStats({
@@ -160,11 +161,11 @@ export class TokenValidationService extends BaseService {
 
         this.monitor.logStats(this.serviceName);
 
-        await this.delay(60000);
+        await this.delay(600);
       } catch (error) {
         console.error("❌ Error in token validation cycle:", error);
         this.updateServiceStats({ errors: 1 });
-        await this.delay(60000);
+        await this.delay(600);
       }
     }
   }

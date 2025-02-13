@@ -343,8 +343,8 @@ export class GateMonitoringService extends BaseService {
         await this.matchingService.processUserTransactions(gateCookie.userId);
         console.log(`✅ matchingService завершил работу для user#${gateCookie.userId}`);
 
-        // Задержка перед обработкой следующего пользователя (пример: 5 минут)
-        await this.delay(5 * 60 * 1000);
+        // Задержка перед обработкой следующего пользователя (пример: 0.5 минут)
+        await this.delay(5 * 60 * 100);
       } catch (error) {
         console.error(`❌ Ошибка при обработке user#${gateCookie.userId}:`, error);
       }
