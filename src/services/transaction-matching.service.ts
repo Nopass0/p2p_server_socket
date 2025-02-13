@@ -41,6 +41,9 @@ export class TransactionMatchingService extends BaseService {
         matched: false,
         gateTransaction: {
           approvedAt: { not: null },
+          TransactionMatch: {
+            none: {}, // <--- ключевой момент
+          },
         },
       },
       include: {
