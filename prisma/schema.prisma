@@ -53,11 +53,11 @@ model GateCookie {
   id          Int      @id @default(autoincrement())
   userId      Int
   cookie      String
+  idexId      String?
   isActive    Boolean  @default(true)
   lastChecked DateTime @default(now())
   createdAt   DateTime @default(now())
   updatedAt   DateTime
-  idexId      String?
   User        User     @relation(fields: [userId], references: [id])
 
   @@unique([userId, cookie])
@@ -66,13 +66,14 @@ model GateCookie {
 model GateTransaction {
   id               Int                @id @default(autoincrement())
   userId           Int
-  transactionId    String             
+transactionId    String   @unique
   paymentMethodId  Int
   wallet           String
   amountRub        Float
   amountUsdt       Float
   totalRub         Float
   totalUsdt        Float
+  idexId           String?
   status           Int
   bankName         String?
   bankLabel        String?
@@ -90,13 +91,30 @@ model GateTransaction {
   traderName       String?
   commissionRate   Float?
   initialBalance   Float?
-  idexId           String?
   User             User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   receipts         Receipt[]
   TransactionMatch TransactionMatch[]
 
+  // Владелец(ы) через промежуточную таблицу:
+  owners GateTransactionOwner[]
+
   @@index([transactionId])
   @@index([userId, createdAt])
+}
+
+model GateTransactionOwner {
+  id                Int      @id @default(autoincrement())
+  userId            Int
+  gateTransactionId Int
+  matched           Boolean  @default(false) // флаг, что транзакция уже смэтчена у данного user'а
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user            User            @relation(fields: [userId], references: [id])
+  gateTransaction GateTransaction @relation(fields: [gateTransactionId], references: [id])
+
+  // Чтобы у одного пользователя не было дубликатов на одну и ту же Gate-транзакцию
+  @@unique([userId, gateTransactionId])
 }
 
 model Session {
@@ -178,43 +196,45 @@ model TronWallet {
 }
 
 model User {
-  id                  Int                   @id @default(autoincrement())
-  telegramId          String?               @unique
-  login               String                @unique
-  password            String
-  username            String?
-  firstName           String?
-  lastName            String?
-  photoUrl            String?
-  isAdmin             Boolean               @default(false)
-  createdAt           DateTime              @default(now())
-  updatedAt           DateTime
-  tgAuthToken         String?
-  geminiToken         String?
-  commissionRate      Float?
-  initialBalance      Float?
-  middleName          String?
-  passportPhoto       String?
-  deposit             Float                 @default(0)
-  salaryPercentage    Float                 @default(0.5)
-  currentTgPhone      String?
-  AdminAction         AdminAction[]
-  Appeal              Appeal[]
-  DeviceToken         DeviceToken[]
-  EmployeeComment     EmployeeComment[]
-  EmployeeExpense     EmployeeExpense[]
-  GateCookie          GateCookie[]
-  GateTransaction     GateTransaction[]
-  P2PTransaction      P2PTransaction[]
-  Screenshot          Screenshot[]
-  Session             Session[]
-  TelegramTransaction TelegramTransaction[]
-  TransactionMatch    TransactionMatch[]
-  TronTransaction     TronTransaction[]
-  TronWallet          TronWallet?
-  UserActivityLog     UserActivityLog[]
-  UserSession         UserSession[]
-  WorkTime            WorkTime[]
+  id                   Int                    @id @default(autoincrement())
+  telegramId           String?                @unique
+  login                String                 @unique
+  password             String
+  username             String?
+  firstName            String?
+  lastName             String?
+  middleName           String?
+  photoUrl             String?
+  passportPhoto        String?
+  deposit              Float                  @default(0)
+  commissionRate       Float?
+  salaryPercentage     Float                  @default(0.5)
+  initialBalance       Float?
+  isAdmin              Boolean                @default(false)
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime
+  tgAuthToken          String?
+  geminiToken          String?
+  currentTgPhone       String?
+  AdminAction          AdminAction[]
+  AppVersion           AppVersion[]
+  Appeal               Appeal[]
+  DeviceToken          DeviceToken[]
+  EmployeeComment      EmployeeComment[]
+  EmployeeExpense      EmployeeExpense[]
+  GateCookie           GateCookie[]
+  GateTransaction      GateTransaction[]
+  P2PTransaction       P2PTransaction[]
+  Screenshot           Screenshot[]
+  Session              Session[]
+  TelegramTransaction  TelegramTransaction[]
+  TransactionMatch     TransactionMatch[]
+  TronTransaction      TronTransaction[]
+  GateTransactionOwner GateTransactionOwner[] // <-- новая связь "многие ко многим" через промежуточную таблицу
+  TronWallet           TronWallet?
+  UserActivityLog      UserActivityLog[]
+  UserSession          UserSession[]
+  WorkTime             WorkTime[]
 
   @@index([telegramId])
   @@index([login])
@@ -278,6 +298,7 @@ model P2PTransaction {
   userId           Int
   telegramId       String
   status           String
+  currentTgPhone   String?
   amount           Float
   totalRub         Float
   price            Float
@@ -287,7 +308,6 @@ model P2PTransaction {
   completedAt      DateTime
   createdAt        DateTime           @default(now())
   processed        Boolean            @default(false)
-  currentTgPhone   String?
   User             User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   TransactionMatch TransactionMatch[]
 
@@ -296,15 +316,17 @@ model P2PTransaction {
   @@index([userId])
 }
 
+// Модель TransactionMatch теперь будет ссылаться на GateTransaction напрямую
 model TransactionMatch {
-  id              Int             @id @default(autoincrement())
-  userId          Int
-  p2pTxId         Int
-  gateTxId        Int
-  isAutoMatched   Boolean         @default(false)
-  timeDifference  Int
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
+  id             Int      @id @default(autoincrement())
+  userId         Int
+  p2pTxId        Int
+  gateTxId       Int
+  isAutoMatched  Boolean  @default(false)
+  timeDifference Int
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
   GateTransaction GateTransaction @relation(fields: [gateTxId], references: [id], onDelete: Cascade)
   P2PTransaction  P2PTransaction  @relation(fields: [p2pTxId], references: [id], onDelete: Cascade)
   User            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -410,13 +432,29 @@ model WorkReportFile {
 model WorkTime {
   id         Int         @id @default(autoincrement())
   userId     Int
+  duration   Float
   startTime  DateTime
   endTime    DateTime?
-  duration   Float
   createdAt  DateTime    @default(now())
   updatedAt  DateTime
   WorkReport WorkReport?
   User       User        @relation(fields: [userId], references: [id])
 
   @@index([userId])
+}
+
+model AppVersion {
+  id          Int      @id @default(autoincrement())
+  version     String   @unique
+  hash        String   @unique
+  fileName    String
+  downloadUrl String
+  isMain      Boolean  @default(false)
+  uploadedBy  Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime
+  User        User     @relation(fields: [uploadedBy], references: [id])
+
+  @@index([isMain])
+  @@index([version])
 }
