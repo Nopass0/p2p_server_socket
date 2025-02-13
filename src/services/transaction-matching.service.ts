@@ -41,9 +41,6 @@ export class TransactionMatchingService extends BaseService {
         matched: false,
         gateTransaction: {
           approvedAt: { not: null },
-          TransactionMatch: {
-            none: {}, // <--- ключевой момент
-          },
         },
       },
       include: {
@@ -55,13 +52,9 @@ export class TransactionMatchingService extends BaseService {
     );
 
     for (const p2pTx of p2pTransactions) {
-      // Попробуем найти подходящую GateTransaction
-      // например, по критериям:
+      // Попробуем найти подходящую GateTransaction по критериям:
       //   - разница по времени <= 30 мин
-      //   - суммы равны (p2pTx.totalRub ~ gateTx.amountRub)
-      // и т.д.
-      // В реальном коде — вероятно, нужно больше логики и фильтров.
-
+      //   - суммы равны (с небольшой погрешностью)
       for (const owner of gateTxOwners) {
         if (!owner.gateTransaction.approvedAt) continue;
 
@@ -69,13 +62,24 @@ export class TransactionMatchingService extends BaseService {
         const timeDiffMinutes = Math.abs(
           (p2pTx.completedAt.getTime() - gateTx.approvedAt.getTime()) / (1000 * 60)
         );
-        // проверяем разницу во времени (например, <= 30 минут)
-        // и равенство сумм (с небольшой погрешностью)
+
         if (
           timeDiffMinutes <= 30 &&
           Math.abs(p2pTx.totalRub - gateTx.amountRub) < 0.01
         ) {
-          // Мэтчим
+          // Проверяем, существует ли уже мэтч с этим gateTxId
+          const existingMatch = await this.db.transactionMatch.findFirst({
+            where: { gateTxId: gateTx.id },
+            select: { id: true },
+          });
+          if (existingMatch) {
+            console.log(
+              `Gate transaction #${gateTx.id} is already matched, skipping...`
+            );
+            continue;
+          }
+
+          // Если мэтча ещё нет – создаём новый
           try {
             await this.db.$transaction([
               // Создаём запись в TransactionMatch
@@ -93,7 +97,7 @@ export class TransactionMatchingService extends BaseService {
                 where: { id: p2pTx.id },
                 data: { processed: true },
               }),
-              // Помечаем GateTransactionOwner, что транзакция для этого user'а уже смэтчена
+              // Помечаем GateTransactionOwner, что транзакция для этого пользователя уже смэтчена
               this.db.gateTransactionOwner.update({
                 where: {
                   userId_gateTransactionId: {
@@ -101,14 +105,14 @@ export class TransactionMatchingService extends BaseService {
                     gateTransactionId: gateTx.id,
                   },
                 },
-                data: {
-                  matched: true,
-                },
+                data: { matched: true },
               }),
             ]);
             matchesCount++;
-            console.log(`✅ Matched P2P #${p2pTx.id} with Gate #${gateTx.id}`);
-            // После удачного мэтча — прерываем цикл, чтобы не матчить p2pTx с другими GateTx
+            console.log(
+              `✅ Matched P2P #${p2pTx.id} with Gate #${gateTx.id}`
+            );
+            // После удачного мэтча прерываем цикл, чтобы не матчить p2pTx с другими GateTx
             break;
           } catch (err) {
             console.error(`❌ Error saving transaction match:`, err);
@@ -143,7 +147,9 @@ export class TransactionMatchingService extends BaseService {
           select: { id: true, username: true, login: true },
         });
 
-        console.log(`👥 Processing ${users.length} users for transaction matching`);
+        console.log(
+          `👥 Processing ${users.length} users for transaction matching`
+        );
 
         // Обрабатываем каждого пользователя
         for (const user of users) {
@@ -152,7 +158,9 @@ export class TransactionMatchingService extends BaseService {
             const matched = await this.processUserTransactions(user.id);
             processedUsers++;
             processedTransactions += matched;
-            console.log(`✅ Completed processing user ${user.id} - found ${matched} matches`);
+            console.log(
+              `✅ Completed processing user ${user.id} - found ${matched} matches`
+            );
           } catch (error) {
             console.error(`❌ Error processing user ${user.id}:`, error);
             errors++;

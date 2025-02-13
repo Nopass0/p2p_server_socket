@@ -66,7 +66,7 @@ model GateCookie {
 model GateTransaction {
   id               Int                @id @default(autoincrement())
   userId           Int
-transactionId    String   @unique
+  transactionId    String             @unique
   paymentMethodId  Int
   wallet           String
   amountRub        Float
@@ -321,7 +321,7 @@ model TransactionMatch {
   id             Int      @id @default(autoincrement())
   userId         Int
   p2pTxId        Int
-  gateTxId       Int
+  gateTxId       Int // <--- добавим ниже @@unique
   isAutoMatched  Boolean  @default(false)
   timeDifference Int
   createdAt      DateTime @default(now())
@@ -332,6 +332,7 @@ model TransactionMatch {
   User            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([p2pTxId, gateTxId])
+
   @@index([userId, createdAt])
   @@index([p2pTxId])
   @@index([gateTxId])
