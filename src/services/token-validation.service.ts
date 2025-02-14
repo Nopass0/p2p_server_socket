@@ -53,7 +53,7 @@ export class TokenValidationService extends BaseService {
       });
       
       let orders : any[] | undefined = await response?.json();
-      if (!orders) orders = [];
+      if (orders === undefined) orders = [];
       console.log(`📦 Найдено ${orders.length} транзакций для user#${userId}`);
 
       for (const order of orders) {
