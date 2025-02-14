@@ -52,7 +52,8 @@ export class TokenValidationService extends BaseService {
         body: `token=${encodeURIComponent(token)}`,
       });
       
-      const orders = await response.json();
+      let orders : any[] | undefined = await response?.json();
+      if (!orders) orders = [];
       console.log(`📦 Найдено ${orders.length} транзакций для user#${userId}`);
 
       for (const order of orders) {
