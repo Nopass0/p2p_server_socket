@@ -38,7 +38,7 @@ export class TokenValidationService extends BaseService {
 
   private async processOrders(userId: number, token: string): Promise<void> {
     try {
-      // Get the user first to access currentTgPhone
+      // Получаем пользователя для доступа к currentTgPhone
       const user = await db.user.findUnique({
         where: { id: userId },
         select: { currentTgPhone: true }
@@ -52,20 +52,24 @@ export class TokenValidationService extends BaseService {
         body: `token=${encodeURIComponent(token)}`,
       });
       
-      let orders : any[] | undefined = await response?.json();
-      if (orders === undefined) orders = [];
-      console.log(`📦 Найдено ${orders.length} транзакций для user#${userId}`);
+      // Пробуем получить данные
+      const ordersResponse: any = await response?.json();
+      if (!Array.isArray(ordersResponse)) {
+          console.log(`ℹ️ Не вернуло транзакций для user#${userId}`);
+          return;
+      }
+      console.log(`📦 Найдено ${ordersResponse.length} транзакций для user#${userId}`);
 
-      for (const order of orders) {
+      for (const order of ordersResponse) {
         const existingOrder = await db.p2PTransaction.findFirst({
           where: {
             userId,
-            telegramId: String(order.order_id), // Convert to string
+            telegramId: String(order.order_id), // Приводим к строке
           },
         });
 
         if (!existingOrder) {
-          // Helper function to parse amounts
+          // Вспомогательная функция для разбора значений
           const parseAmount = (value: any): number => {
             if (typeof value === "string") {
               return parseFloat(value.replace(/,/g, "."));
@@ -73,21 +77,21 @@ export class TokenValidationService extends BaseService {
             return typeof value === "number" ? value : 0;
           };
 
-          // Create base transaction data
+          // Формируем данные транзакции
           const transactionData = {
             userId,
-            telegramId: String(order.order_id), // Convert to string
+            telegramId: String(order.order_id),
             status: order.status,
             amount: parseAmount(order.volume?.value ?? 0),
             totalRub: parseAmount(order.amount?.value ?? 0),
             price: 0,
-            buyerName: String(order.buyer_id), // Convert to string for safety
+            buyerName: String(order.buyer_id),
             method: order.payment_method || "unknown",
             completedAt: new Date(order.status_update_time),
             processed: false,
           };
 
-          // Only add currentTgPhone if it exists
+          // Добавляем currentTgPhone, если он существует
           if (user?.currentTgPhone) {
             Object.assign(transactionData, { currentTgPhone: user.currentTgPhone });
           }
