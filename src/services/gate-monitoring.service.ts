@@ -352,9 +352,9 @@ export class GateMonitoringService extends BaseService {
 
     this.updateServiceStats({
       lastRunTime: new Date(),
-      isRunning: false,
+      isRunning: true,
     });
-    this.isRunning = false;
+    this.isRunning = true;
   }
 
   stop(): void {
