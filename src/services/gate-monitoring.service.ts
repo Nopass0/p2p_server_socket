@@ -146,7 +146,7 @@ export class GateMonitoringService extends BaseService {
       } else {
         console.error(
           `❌ Cookie validation error for user ${gateCookie.userId} (Cookie ID: ${gateCookie.id}):`,
-          error
+          // error
         );
       }
       await db.gateCookie.update({
@@ -179,7 +179,7 @@ export class GateMonitoringService extends BaseService {
     } catch (error) {
       console.error(
         `❌ Error fetching Gate transactions for user ${gateCookie.userId} on page ${page}:`,
-        error
+        // error
       );
       return [];
     }
@@ -354,7 +354,9 @@ export class GateMonitoringService extends BaseService {
         // Небольшая задержка между обработкой пользователей чтобы не перегружать систему
         await this.delay(1000);
       } catch (error) {
-        console.error(`❌ Ошибка при обработке user#${gateCookie.userId}:`, error);
+        console.error(`❌ Ошибка при обработке user#${gateCookie.userId}:`, 
+          // error
+        );
       }
     }
 
