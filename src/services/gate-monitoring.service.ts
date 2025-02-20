@@ -86,6 +86,8 @@ export class GateMonitoringService extends BaseService {
     "https://panel.gate.cx/api/v1/payments/payouts?filters%5Bstatus%5D%5B%5D=2&filters%5Bstatus%5D%5B%5D=3&filters%5Bstatus%5D%5B%5D=7&filters%5Bstatus%5D%5B%5D=8&filters%5Bstatus%5D%5B%5D=9&page=";
   private readonly GATE_USER_AGENT =
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36";
+  private readonly MONITORING_INTERVAL = 60 * 1000; // 1 minute in milliseconds
+  private intervalId: NodeJS.Timeout | null = null;
   private matchingService: TransactionMatchingService;
 
   constructor(monitor: ServiceMonitor, matchingService: TransactionMatchingService) {
@@ -197,10 +199,6 @@ export class GateMonitoringService extends BaseService {
     return allTransactions;
   }
 
-  /**
-   * Сохранение/обновление транзакций для конкретного пользователя.
-   * Привязка к пользователю осуществляется через таблицу GateTransactionOwner.
-   */
   private async processTransactions(
     userId: number,
     transactions: GatePayment[],
@@ -308,6 +306,16 @@ export class GateMonitoringService extends BaseService {
     this.isRunning = true;
     this.updateServiceStats({ isRunning: true });
 
+    // Initial run
+    await this.processAllCookies();
+    
+    // Set up interval for periodic runs
+    this.intervalId = setInterval(async () => {
+      await this.processAllCookies();
+    }, this.MONITORING_INTERVAL);
+  }
+
+  private async processAllCookies(): Promise<void> {
     const gateCookies = await db.gateCookie.findMany({
       where: { isActive: true },
     });
@@ -343,8 +351,8 @@ export class GateMonitoringService extends BaseService {
         await this.matchingService.processUserTransactions(gateCookie.userId);
         console.log(`✅ matchingService завершил работу для user#${gateCookie.userId}`);
 
-        // Задержка перед обработкой следующего пользователя (пример: 0.5 минут)
-        await this.delay(5 * 60 * 100);
+        // Небольшая задержка между обработкой пользователей чтобы не перегружать систему
+        await this.delay(1000);
       } catch (error) {
         console.error(`❌ Ошибка при обработке user#${gateCookie.userId}:`, error);
       }
@@ -354,10 +362,13 @@ export class GateMonitoringService extends BaseService {
       lastRunTime: new Date(),
       isRunning: true,
     });
-    this.isRunning = true;
   }
 
   stop(): void {
+    if (this.intervalId) {
+      clearInterval(this.intervalId);
+      this.intervalId = null;
+    }
     this.isRunning = false;
     this.updateServiceStats({ isRunning: false });
   }

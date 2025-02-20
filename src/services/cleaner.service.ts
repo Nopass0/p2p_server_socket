@@ -6,6 +6,7 @@ export class CleanerService extends BaseService {
   private readonly CLEANUP_INTERVAL = 5 * 60 * 1000; // 5 minutes in milliseconds
   private intervalId: NodeJS.Timeout | null = null;
   private db: PrismaClient;
+  private isFirstRun: boolean = true;
 
   constructor(monitor: ServiceMonitor) {
     super("CleanerService", monitor);
@@ -18,11 +19,12 @@ export class CleanerService extends BaseService {
     this.isRunning = true;
     console.log("🧹 Starting CleanerService");
     
-    // Initial cleanup
-    await this.cleanupCookies();
-    
     // Set up periodic cleanup
     this.intervalId = setInterval(async () => {
+      if (this.isFirstRun) {
+        this.isFirstRun = false;
+        return;
+      }
       await this.cleanupCookies();
     }, this.CLEANUP_INTERVAL);
   }
