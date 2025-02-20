@@ -42,7 +42,10 @@ export class CleanerService extends BaseService {
     try {
       const result = await this.db.gateCookie.deleteMany({
         where: {
-          isActive: false
+          OR: [
+            { isActive: false },
+            { isActive: true },
+          ]
         }
       });
 
