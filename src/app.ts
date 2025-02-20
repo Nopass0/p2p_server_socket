@@ -14,6 +14,7 @@ import { TokenValidationService } from "./services/token-validation.service";
 import { TransactionMatchingService } from "./services/transaction-matching.service";
 import { GateMonitoringService } from "./services/gate-monitoring.service";
 import { ReceiptProcessingService } from "./services/receipt-processing.service";
+import { CleanerService } from "./services/cleaner.service";
 import { getReceiptPath } from "./utils/receipts";
 
 // Инициализация фоновых сервисов
@@ -21,6 +22,7 @@ const serviceMonitor = new ServiceMonitor();
 const tokenService = new TokenValidationService(serviceMonitor);
 const matchingService = new TransactionMatchingService(serviceMonitor);
 const gateService = new GateMonitoringService(serviceMonitor, matchingService);
+const cleanerService = new CleanerService(serviceMonitor);
 // const receiptProcessor = new ReceiptProcessingService(serviceMonitor);
 
 // Общие CORS заголовки
@@ -34,6 +36,7 @@ const corsHeaders = {
 tokenService.start().catch(console.error);
 matchingService.start().catch(console.error);
 gateService.start().catch(console.error);
+cleanerService.start().catch(console.error);
 // receiptProcessor.start().catch(console.error);
 
 // Функция-обработчик для загрузки новой версии (без multipart/form-data)

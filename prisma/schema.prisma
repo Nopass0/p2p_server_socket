@@ -64,9 +64,9 @@ model GateCookie {
 }
 
 model GateTransaction {
-  id               Int                @id @default(autoincrement())
+  id               Int                    @id @default(autoincrement())
   userId           Int
-  transactionId    String             @unique
+  transactionId    String                 @unique
   paymentMethodId  Int
   wallet           String
   amountRub        Float
@@ -83,7 +83,7 @@ model GateTransaction {
   successRate      Float?
   approvedAt       DateTime?
   expiredAt        DateTime?
-  createdAt        DateTime           @default(now())
+  createdAt        DateTime               @default(now())
   updatedAt        DateTime
   attachments      Json?
   bankCode         String?
@@ -91,29 +91,25 @@ model GateTransaction {
   traderName       String?
   commissionRate   Float?
   initialBalance   Float?
-  User             User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  User             User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  owners           GateTransactionOwner[]
   receipts         Receipt[]
   TransactionMatch TransactionMatch[]
-
-  // Владелец(ы) через промежуточную таблицу:
-  owners GateTransactionOwner[]
 
   @@index([transactionId])
   @@index([userId, createdAt])
 }
 
 model GateTransactionOwner {
-  id                Int      @id @default(autoincrement())
+  id                Int             @id @default(autoincrement())
   userId            Int
   gateTransactionId Int
-  matched           Boolean  @default(false) // флаг, что транзакция уже смэтчена у данного user'а
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  matched           Boolean         @default(false)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  gateTransaction   GateTransaction @relation(fields: [gateTransactionId], references: [id])
+  user              User            @relation(fields: [userId], references: [id])
 
-  user            User            @relation(fields: [userId], references: [id])
-  gateTransaction GateTransaction @relation(fields: [gateTransactionId], references: [id])
-
-  // Чтобы у одного пользователя не было дубликатов на одну и ту же Gate-транзакцию
   @@unique([userId, gateTransactionId])
 }
 
@@ -224,13 +220,13 @@ model User {
   EmployeeExpense      EmployeeExpense[]
   GateCookie           GateCookie[]
   GateTransaction      GateTransaction[]
+  GateTransactionOwner GateTransactionOwner[]
   P2PTransaction       P2PTransaction[]
   Screenshot           Screenshot[]
   Session              Session[]
   TelegramTransaction  TelegramTransaction[]
   TransactionMatch     TransactionMatch[]
   TronTransaction      TronTransaction[]
-  GateTransactionOwner GateTransactionOwner[] // <-- новая связь "многие ко многим" через промежуточную таблицу
   TronWallet           TronWallet?
   UserActivityLog      UserActivityLog[]
   UserSession          UserSession[]
@@ -316,23 +312,20 @@ model P2PTransaction {
   @@index([userId])
 }
 
-// Модель TransactionMatch теперь будет ссылаться на GateTransaction напрямую
 model TransactionMatch {
-  id             Int      @id @default(autoincrement())
-  userId         Int
-  p2pTxId        Int
-  gateTxId       Int // <--- добавим ниже @@unique
-  isAutoMatched  Boolean  @default(false)
-  timeDifference Int
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
+  id              Int             @id @default(autoincrement())
+  userId          Int
+  p2pTxId         Int
+  gateTxId        Int
+  isAutoMatched   Boolean         @default(false)
+  timeDifference  Int
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
   GateTransaction GateTransaction @relation(fields: [gateTxId], references: [id], onDelete: Cascade)
   P2PTransaction  P2PTransaction  @relation(fields: [p2pTxId], references: [id], onDelete: Cascade)
   User            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([p2pTxId, gateTxId])
-
   @@index([userId, createdAt])
   @@index([p2pTxId])
   @@index([gateTxId])
@@ -364,10 +357,20 @@ model CustomMetric {
 }
 
 model Expense {
-  id     Int      @id @default(autoincrement())
-  amount Float
-  date   DateTime
-  name   String
+  id          Int      @id @default(autoincrement())
+  amount      Float
+  date        DateTime
+  createdAt   DateTime @default(now())
+  currency    String
+  description String?
+  type        String
+  updatedAt   DateTime
+  isIncome    Boolean  @default(false)
+  isRecurring Boolean  @default(false)
+  period      String?
+  processed   Boolean  @default(false)
+
+  @@index([type])
 }
 
 model Appeal {
@@ -393,6 +396,8 @@ model EmployeeComment {
   createdAt DateTime @default(now())
   updatedAt DateTime
   User      User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
 }
 
 model EmployeeExpense {
@@ -458,4 +463,62 @@ model AppVersion {
 
   @@index([isMain])
   @@index([version])
+}
+
+model BankCard {
+  id        Int      @id @default(autoincrement())
+  simCardId Int      @unique
+  bankName  String
+  ownerName String
+  balance   Float    @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime
+  SimCard   SimCard  @relation(fields: [simCardId], references: [id], onDelete: Cascade)
+
+  @@index([bankName])
+}
+
+model Income {
+  id          Int      @id @default(autoincrement())
+  amount      Float
+  type        String
+  currency    String
+  date        DateTime
+  description String?
+  isRecurring Boolean  @default(false)
+  period      String?
+  profit      Float?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime
+  processed   Boolean  @default(false)
+  returned    Boolean  @default(false)
+
+  @@index([type])
+}
+
+model SimCard {
+  id          Int             @id @default(autoincrement())
+  phoneNumber String          @unique
+  status      SimCardStatus   @default(NEW)
+  category    SimCardCategory
+  orderNumber Int             @default(autoincrement())
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime
+  BankCard    BankCard?
+
+  @@index([category])
+  @@index([status])
+}
+
+enum SimCardCategory {
+  TELEGRAM
+  BANK
+}
+
+enum SimCardStatus {
+  NEW
+  VERIFIED
+  WORKING
+  BLOCKED
+  FROZEN_FUNDS
 }
