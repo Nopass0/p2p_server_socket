@@ -145,7 +145,7 @@ export class GateMonitoringService extends BaseService {
         );
       } else {
         console.error(
-          `❌ Cookie validation error for user ${gateCookie.userId} (Cookie ID: ${gateCookie.id}):`,
+          `❌ Cookie validation error for user ${gateCookie.userId} (Cookie ID: ${gateCookie.id}): \n ${error}`,
           // error
         );
       }
