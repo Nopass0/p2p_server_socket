@@ -86,7 +86,7 @@ export class GateMonitoringService extends BaseService {
     "https://panel.gate.cx/api/v1/payments/payouts?filters%5Bstatus%5D%5B%5D=2&filters%5Bstatus%5D%5B%5D=3&filters%5Bstatus%5D%5B%5D=7&filters%5Bstatus%5D%5B%5D=8&filters%5Bstatus%5D%5B%5D=9&page=";
   private readonly GATE_USER_AGENT =
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36";
-  private readonly MONITORING_INTERVAL = 60 * 1000; // 1 minute in milliseconds
+  private readonly MONITORING_INTERVAL = 60 * 1000 * 10; // 1 minute in milliseconds
   private intervalId: NodeJS.Timeout | null = null;
   private matchingService: TransactionMatchingService;
 
