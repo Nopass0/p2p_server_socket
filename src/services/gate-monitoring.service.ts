@@ -194,7 +194,7 @@ export class GateMonitoringService extends BaseService {
       const transactions = await this.fetchGateTransactions(gateCookie, page);
       if (transactions.length === 0) break;
       allTransactions.push(...transactions);
-      await this.delay(500);
+      await this.delay(5000);
     }
     return allTransactions;
   }
@@ -352,7 +352,7 @@ export class GateMonitoringService extends BaseService {
         console.log(`✅ matchingService завершил работу для user#${gateCookie.userId}`);
 
         // Небольшая задержка между обработкой пользователей чтобы не перегружать систему
-        await this.delay(1000);
+        await this.delay(3000);
       } catch (error) {
         console.error(`❌ Ошибка при обработке user#${gateCookie.userId}:`, 
           // error
