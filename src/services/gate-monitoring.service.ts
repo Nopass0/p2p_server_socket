@@ -208,11 +208,15 @@ export class GateMonitoringService extends BaseService {
 
     for (const t of transactions) {
       const transactionId = String(t.id);
+      const idexId = String(t.trader?.id) || null;
 
       try {
-        // Ищем транзакцию по уникальному transactionId
-        let existingTx = await db.gateTransaction.findUnique({
-          where: { transactionId },
+        // Ищем транзакцию по уникальному transactionId И idexId (кабинету)
+        let existingTx = await db.gateTransaction.findFirst({
+          where: { 
+            transactionId,
+            idexId,
+          },
         });
 
         if (!existingTx) {
@@ -245,7 +249,7 @@ export class GateMonitoringService extends BaseService {
               idexId: String(t.trader?.id) || null,
             },
           });
-          console.log(`✅ Добавлена новая GateTransaction ${transactionId}.`);
+          console.log(`✅ Добавлена новая GateTransaction ${transactionId} для кабинета ${idexId}.`);
         } else {
           // Опционально обновляем существующую транзакцию (например, статус и updatedAt)
           await db.gateTransaction.update({
@@ -288,7 +292,7 @@ export class GateMonitoringService extends BaseService {
         }
       } catch (error) {
         console.error(
-          `❌ Ошибка при обработке транзакции Gate#${t.id} для user#${userId}:`,
+          `❌ Ошибка при обработке транзакции Gate#${t.id} для user#${userId} (кабинет ${idexId}):`,
           error
         );
       }
